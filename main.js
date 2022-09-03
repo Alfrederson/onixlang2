@@ -64,7 +64,6 @@ const tool = {
         }else{
             TODO("Implementar toC de "+no.constructor.name)
             return "?"
-            
         }
     },
     toJS(no, nivel){
@@ -76,7 +75,6 @@ const tool = {
         }else{
             TODO("Implementar toJS de "+no.constructor.name)
             return "?"
-            
         }
     },
     toAST(no){
