@@ -1,0 +1,25 @@
+{
+  "program": {
+    "records": [],
+    "functions": [],
+    "declarations": [],
+    "children": [
+      {
+        "assignment": {
+          "op": "=",
+          "left": {
+            "var": "a"
+          },
+          "right": {
+            "index": {
+              "owner": {
+                "var": "x"
+              },
+              "element": 3
+            }
+          }
+        }
+      }
+    ]
+  }
+}

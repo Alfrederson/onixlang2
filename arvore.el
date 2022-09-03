@@ -1,0 +1,1 @@
+(program (block (statement (assignment (assignmentUnit (postfixExpression (primaryExpression (identifier a)))) (assignOp =) (exp (postfixExpression (postfixExpression (primaryExpression (identifier x))) [ (exp (postfixExpression (primaryExpression (number 3)))) ]))))) <EOF>)

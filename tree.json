@@ -1,0 +1,81 @@
+{
+  "type": "program",
+  "records": [],
+  "functions": [],
+  "declarations": [],
+  "children": [
+    {
+      "type": "numeric",
+      "value": {
+        "type": "hex",
+        "val": 255,
+        "raw": "0xFF"
+      }
+    },
+    {
+      "type": "numeric",
+      "value": {
+        "type": "bin",
+        "val": 15,
+        "raw": "0b1111"
+      }
+    },
+    {
+      "type": "text",
+      "value": "teste"
+    },
+    {
+      "type": "var",
+      "name": "ASTRAZENECA"
+    },
+    {
+      "type": "call",
+      "path": {
+        "type": "var",
+        "name": "PRINT"
+      },
+      "args": [
+        {
+          "type": "numeric",
+          "value": {
+            "type": "dec",
+            "val": 0,
+            "raw": "0"
+          }
+        },
+        {
+          "type": "numeric",
+          "value": {
+            "type": "dec",
+            "val": 1,
+            "raw": "1"
+          }
+        },
+        {
+          "type": "numeric",
+          "value": {
+            "type": "dec",
+            "val": 2,
+            "raw": "2"
+          }
+        },
+        {
+          "type": "numeric",
+          "value": {
+            "type": "dec",
+            "val": 3,
+            "raw": "3"
+          }
+        },
+        {
+          "type": "numeric",
+          "value": {
+            "type": "dec",
+            "val": 4,
+            "raw": "4"
+          }
+        }
+      ]
+    }
+  ]
+}

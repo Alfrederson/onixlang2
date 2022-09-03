@@ -1,0 +1,26 @@
+{
+  "name": "transpileitor2",
+  "version": "1.0.0",
+  "description": "Compilador/Transpilador de OnixLang. Versão em java estava um lixo.",
+  "main": "main.js",
+  "scripts": {
+    "test": "node main.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Alfrederson/onixlang2.git"
+  },
+  "keywords": [
+    "transpilador"
+  ],
+  "author": "Ruy Vieira",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/Alfrederson/onixlang2/issues"
+  },
+  "homepage": "https://github.com/Alfrederson/onixlang2#readme",
+  "dependencies": {
+    "antlr4": "4.8",
+    "json-format": "^1.0.1"
+  }
+}
