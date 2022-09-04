@@ -34,8 +34,8 @@ function analisar(codigo_fonte, arvore){
 
 const ler = nome => fs.readFileSync(nome).toString()
 
-function escreve(path, texto){
-    fs.open(path, "w", (err,fd)=>{
+function escreve(path, texto, callback){
+    return fs.open(path, "w", (err,fd)=>{
         if(!err){
             let b = new Buffer.from(texto)
             fs.write(fd, b, 0, b.length, null, (err, bytes)=>{
@@ -43,6 +43,8 @@ function escreve(path, texto){
                     console.log(err)
                 }else{
                     console.log(bytes + " escritos em "+path)
+                    if(callback)
+                        callback()
                 }
             })
         }else{
@@ -94,8 +96,22 @@ const tool = {
         }
     },
 
-    isStatement : no => (no.isStatement && no.isStatement())
+    // this is needed because some elements can be statements depending on what their appendages are
+    // e.g: x.y() is a statement
+    isStatement : no => {
+        if(!no.isStatement)
+            TODO("Talvez implementar isStatement de "+no.constructor.name+"?")
+        if(typeof no.isStatement !== "function")
+            throw "O isStatement de "+no.constructor.name+" deveria ser uma função"
+
+        return (no.isStatement && no.isStatement())
+    }
 }
+
+//
+const
+    F_TRUE = () => true,
+    F_FALSE = () => false
 
 
 
@@ -104,7 +120,7 @@ function Program(){
     this.records = [],
     this.functions= [],
     this.declarations= [],
-    this.children= []
+    this.body = []
     
     return this
 }
@@ -114,17 +130,19 @@ Program.prototype.toAST = function(){
         records      : this.records     .map( c => tool.toAST(c)),
         functions    : this.functions   .map( c => tool.toAST(c)),
         declarations : this.declarations.map( c => tool.toAST(c)),
-        children     : this.children    .map( c => tool.toAST(c) )
+        body         : this.body        .map( c =>{
+            console.log("Fazendo ast de "+c)
+            return tool.toAST(c)
+        })
     }}
 }
 
 Program.prototype.toC = function(nivel){
     let output = "int main(){\n"
 
-    let i = tool.indent(nivel+1)
-    this.children.forEach( c => {
+    this.body.forEach( c => {
         if(tool.isStatement(c))
-            output += i + tool.toC(c, nivel+1) + ";\n"
+            output += tool.toC(c, nivel+1) + ";\n"
     })
 
     output += "}\n"
@@ -133,17 +151,52 @@ Program.prototype.toC = function(nivel){
 
 Program.prototype.toJS = function(nivel){
     let output = "function main(){\n"
-    let i = tool.indent(nivel+1)
 
-    this.children.forEach( c => {
+    this.body.forEach( c => {
         // JS não deixa fazer isso. Tem que filtrar.
         if(tool.isStatement(c))
-            output += i + tool.toJS(c, nivel+1) + ";\n"
+            output += tool.toJS(c, nivel+1) + ";\n"
     })
 
     output += "}\n"
+    output += "main()"
     return output
 }
+
+function While(condition){
+    this.type = "while"
+    this.condition = condition
+    return this
+}
+
+While.prototype = {
+    isStatement : F_TRUE,
+    toAST(){
+        return {while : {
+                condition : tool.toAST(this.condition),
+                body      : this.body.map( c => tool.toAST(c))
+        }}
+    },
+    toC(nivel){
+        let i = tool.indent(nivel)
+        let output = i+"while(" + tool.toC(this.condition) + "){\n"
+
+        output += this.body.map( s=> tool.toC(s, nivel+1) + ";").join("\n")+"\n"
+        output += i+"}"
+
+        return output
+    },
+    toJS(nivel){
+        let i = tool.indent(nivel)
+        let output = i+"while(" + tool.toJS(this.condition) + "){\n"
+        
+        output += this.body.map( s=> tool.toJS(s, nivel+1) + ";").join("\n")+"\n"
+        output += i+"}"
+
+        return output
+    }
+}
+
 
 function Assignment(left, op, right){
     this.type = "assignment"
@@ -152,22 +205,23 @@ function Assignment(left, op, right){
     this.op = op
     return this
 }
-
-Assignment.prototype.toAST = function(){
-    return {assignment : { op : this.op ,
-                         left : tool.toAST(this.left),
-                         right: tool.toAST(this.right) }}
-    
-}
-
-Assignment.prototype.isStatement = () => true
-
-Assignment.prototype.toC = function(nivel){
-    return tool.toC(this.left) + this.op + tool.toC(this.right)
-}
-
-Assignment.prototype.toJS = function(nivel){
-    return tool.toJS(this.left) + this.op + tool.toJS(this.right)
+Assignment.prototype = {
+    isStatement: F_TRUE,
+    toAST() {
+        return {
+            assignment: {
+                op: this.op,
+                left: tool.toAST(this.left),
+                right: tool.toAST(this.right)
+            }
+        }
+    },
+    toC(nivel){
+        return tool.indent(nivel) + tool.toC(this.left) + this.op + tool.toC(this.right)
+    },
+    toJS(nivel){
+        return tool.indent(nivel) + tool.toJS(this.left) + this.op + tool.toJS(this.right)
+    }
 }
 
 function Binary(a, op, b){
@@ -177,14 +231,18 @@ function Binary(a, op, b){
     this.b = b
     return this
 }
-
-Binary.prototype.toC = function(nivel){
-    return tool.toC(this.a) + this.op + tool.toC(this.b)
+Binary.prototype = {
+    toAST(){
+        return "blah"
+    },
+    toC(nivel){
+        return tool.toC(this.a) + this.op + tool.toC(this.b)
+    },
+    toJS(nivel){
+        return tool.toJS(this.a) + this.op + tool.toJS(this.b)
+    }
 }
 
-Binary.prototype.toJS = function(nivel){
-    return tool.toJS(this.a) + this.op + tool.toJS(this.b)
-}
 
 function argList (expList){
     let list = []
@@ -199,21 +257,15 @@ function argList (expList){
 const visit = {
     Program(context){
         let program =new Program()
-    
-        Node.pushNode(program)
-        console.log("PORRA")
 
-        if(context.block()){
-            context.block().forEach( block =>
-                console.log("F")    
-            )
-        }
+        Node.pushNode(program)
 
         context.children.forEach( block => 
             Node.addChild(visit.Block(block))   
         )
-    
+
         Node.popNode()
+
         return program
     },
     /*
@@ -272,13 +324,9 @@ const visit = {
         Blocos
     */
     Block(b){
-        console.log("Bloco "+b)
         if(b.statement){
-            console.log("Statement")
             return visit.Statement(b.statement())
         }
-            
-        
     },
 
     /*
@@ -287,8 +335,8 @@ const visit = {
     Statement(s){
 /*
    : declaration //   
-   | assignment //
-   | postfixExpression //
+   | assignment *
+   | postfixExpression *
    | conditional //
    | for_loop //
    | while_loop //
@@ -302,13 +350,17 @@ const visit = {
    | continueLoop
    | retStatement
 */
+        // x = y
         if(s.assignment())
             return visit.Assignment(s.assignment())
-        console.log("Não é assignment")
+
+        // x()
         if(s.postfixExpression())
             return visit.Postfix(s.postfixExpression())
 
-        
+        // while x: end
+        if(s.while_loop())
+            return visit.While(s.while_loop())
     },
 
     Assignment(a){
@@ -321,7 +373,28 @@ const visit = {
             )
         return r
     },
+
+    /**
+     * 
+     * @param {body} b 
+     * @returns array containing all statements inside a body
+     */
+    Body(b){
+        return b.statement().map( s => visit.Statement(s) )
+    },
     
+    While(w){
+        let _while = new While(visit.Expression(w.exp()))
+        // condição
+        // corpo
+        Node.pushNode(_while)
+        visit.Body(w.body()).forEach( s =>{
+            Node.addChild(s)
+        })
+        Node.popNode()
+        
+        return _while
+    },
     
     /*
         Expressões
@@ -338,6 +411,8 @@ const visit = {
             return new Text(visit.String(p.string()))
         }
     },
+
+    // Esse bloco está horrível porque o postfix compreende muitas regras ao mesmo tempo.
     Postfix(p){
         // O que eu faço com uma merda de expressão tipo
         // a.b->c::d ?
@@ -407,30 +482,32 @@ const visit = {
     }            
 }
 
-function Call(path, args){
+function Call(w, args){
+
     this.type = "call"
-    this.path = path
+    this.what = w
     this.args = args
+
     return this
 }
 
-Call.prototype.isStatement = () => true
-
-Call.prototype.toAST = function(){
-    return [tool.toAST(this.path),
+Call.prototype = {
+    isStatement : F_TRUE,
+    toAST(){
+        return [tool.toAST(this.what),
             this.args.map( a => tool.toAST(a))
            ]
+    },
+    toC(nivel){
+        let args = this.args.map( a => tool.toC(a) ).join(",")
+        return tool.indent(nivel) + tool.toC( this.what ) + "(" + args +")"
+    },
+    toJS(nivel){
+        let args = this.args.map( a => tool.toJS(a) ).join(",")
+        return tool.indent(nivel) + tool.toJS( this.what ) + "(" + args + ")"        
+    }
 }
 
-Call.prototype.toC = function(nivel){
-    let args = this.args.map( a => tool.toC(a) ).join(",")
-    return tool.toC( this.path ) + "(" + args +")"
-}
-
-Call.prototype.toJS = function(nivel){
-    let args = this.args.map( a => tool.toJS(a) ).join(",")
-    return tool.toJS( this.path ) + "(" + args + ")"
-}
 
 /*
     Regras:
@@ -493,11 +570,11 @@ Property.prototype.isStatement = function(){
 
 Property.prototype.toC =
 function(nivel){
-    return tool.toC(this.owner) + this.op + tool.toC(this.field)
+    return tool.indent(nivel) + tool.toC(this.owner) + this.op + tool.toC(this.field)
 }
 Property.prototype.toJS = 
 function(nivel){
-    return tool.toJS(this.owner) + "." + tool.toJS(this.field)
+    return tool.indent(nivel) + tool.toJS(this.owner) + "." + tool.toJS(this.field)
 }
 
 const jsonFormat = require('json-format')
@@ -516,6 +593,11 @@ let formatted = jsonFormat(programa.toAST(),{
 escreve("ast.json"   , formatted)
 escreve("output.cpp" , programa.toC (0))
 escreve("output.js"  , programa.toJS(0))
+
+console.log("Executando o gerado...")
+
+eval(programa.toJS(0))
+
 
 // Ver o que eu tenho que fazer.
 TODOS()

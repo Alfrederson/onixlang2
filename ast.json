@@ -3,21 +3,47 @@
     "records": [],
     "functions": [],
     "declarations": [],
-    "children": [
+    "body": [
       {
         "assignment": {
           "op": "=",
           "left": {
-            "var": "a"
+            "var": "x"
           },
-          "right": {
-            "index": {
-              "owner": {
-                "var": "x"
-              },
-              "element": 3
+          "right": 0
+        }
+      },
+      {
+        "while": {
+          "condition": "blah",
+          "body": [
+            {
+              "assignment": {
+                "op": "=",
+                "left": {
+                  "var": "x"
+                },
+                "right": "blah"
+              }
+            },
+            {
+              "property": {
+                "owner": {
+                  "var": "console"
+                },
+                "field": [
+                  {
+                    "var": "log"
+                  },
+                  [
+                    {
+                      "var": "x"
+                    }
+                  ]
+                ]
+              }
             }
-          }
+          ]
         }
       }
     ]

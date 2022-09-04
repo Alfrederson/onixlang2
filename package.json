@@ -4,7 +4,7 @@
   "description": "Compilador/Transpilador de OnixLang. Versão em java estava um lixo.",
   "main": "main.js",
   "scripts": {
-    "test": "node main.js"
+    "test": "node --trace-uncaught main.js"
   },
   "repository": {
     "type": "git",
