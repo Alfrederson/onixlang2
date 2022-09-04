@@ -24,37 +24,21 @@ function analisar(codigo_fonte, arvore){
         tokens = new antlr4.CommonTokenStream(lexer),
         parser = new onixParser.onixParser(tokens)
     parser.buildParseTrees = true
+
     if(arvore){
         escreve("arvore.el", parser.program().toStringTree(parser.ruleNames))
         return analisar(codigo_fonte,false)
     }else{
         return parser.program()
     }
+
 }
 
 const ler = nome => fs.readFileSync(nome).toString()
-
-function escreve(path, texto, callback){
-    return fs.open(path, "w", (err,fd)=>{
-        if(!err){
-            let b = new Buffer.from(texto)
-            fs.write(fd, b, 0, b.length, null, (err, bytes)=>{
-                if(err){
-                    console.log(err)
-                }else{
-                    console.log(bytes + " escritos em "+path)
-                    if(callback)
-                        callback()
-                }
-            })
-        }else{
-            console.log(err)
-        }
-    })
-}
-
+const escreve = (path, texto) => fs.writeFileSync(path,texto)
 
 const tool = {
+
     indent(nivel){
         return " ".repeat(nivel)
     },
@@ -84,8 +68,11 @@ const tool = {
             return no.toAST()
         }else{
             TODO("Implementar toAST de "+no.constructor.name)
-            throw "Não consigo fazer a AST. Implementar toAST de "+no.constructor.name
+            return []
         }
+    },
+    bodyToAST(body){
+        return body.map( c => tool.toAST(c))
     },
     validar(no){
         if(no.validate){
@@ -125,56 +112,52 @@ function Program(){
     return this
 }
 
-Program.prototype.toAST = function(){
-    return { program : {
-        records      : this.records     .map( c => tool.toAST(c)),
-        functions    : this.functions   .map( c => tool.toAST(c)),
-        declarations : this.declarations.map( c => tool.toAST(c)),
-        body         : this.body        .map( c =>{
-            console.log("Fazendo ast de "+c)
-            return tool.toAST(c)
+Program.prototype = {
+    toAST(){
+        return { program : {
+            records      : this.records     .map( c => tool.toAST(c)),
+            functions    : this.functions   .map( c => tool.toAST(c)),
+            declarations : this.declarations.map( c => tool.toAST(c)),
+            body         : tool.bodyToAST( this.body)
+        }}
+    },
+    toC(nivel){
+        let output = "int main(){\n"
+        this.body.forEach( c => {
+            if(tool.isStatement(c))
+                output += tool.toC(c, nivel+1) + ";\n"
         })
-    }}
+        output += "}\n"
+        return output
+    },
+    toJS(nivel){
+        let output = "function main(){\n"
+    
+        this.body.forEach( c => {
+            // JS não deixa fazer isso. Tem que filtrar.
+            if(tool.isStatement(c))
+                output += tool.toJS(c, nivel+1) + ";\n"
+        })
+    
+        output += "}\n"
+        output += "main()"
+        return output
+    }
 }
 
-Program.prototype.toC = function(nivel){
-    let output = "int main(){\n"
 
-    this.body.forEach( c => {
-        if(tool.isStatement(c))
-            output += tool.toC(c, nivel+1) + ";\n"
-    })
-
-    output += "}\n"
-    return output
-}
-
-Program.prototype.toJS = function(nivel){
-    let output = "function main(){\n"
-
-    this.body.forEach( c => {
-        // JS não deixa fazer isso. Tem que filtrar.
-        if(tool.isStatement(c))
-            output += tool.toJS(c, nivel+1) + ";\n"
-    })
-
-    output += "}\n"
-    output += "main()"
-    return output
-}
 
 function While(condition){
     this.type = "while"
     this.condition = condition
     return this
 }
-
 While.prototype = {
     isStatement : F_TRUE,
     toAST(){
         return {while : {
                 condition : tool.toAST(this.condition),
-                body      : this.body.map( c => tool.toAST(c))
+                body      : tool.bodyToAST(this.body)
         }}
     },
     toC(nivel){
@@ -193,6 +176,174 @@ While.prototype = {
         output += this.body.map( s=> tool.toJS(s, nivel+1) + ";").join("\n")+"\n"
         output += i+"}"
 
+        return output
+    }
+}
+
+function Repeat(condition){
+    this.type = "repeat"
+    this.condition = condition
+    return this 
+}
+
+Repeat.prototype={
+    isStatement : F_TRUE,
+    toC (nivel){
+        let i = tool.indent(nivel)
+        let output = i+"do{\n"
+        output += this.body.map( s => tool.toC(s, nivel+1) + ";").join("\n")+"\n"
+        output += i + "}while(!("+tool.toC(this.condition)+"));"
+        return output
+    },
+    toJS(nivel){
+        let i = tool.indent(nivel)
+        let output = i+"do{\n";
+        output += this.body.map( s => tool.toJS(s, nivel+1) + ";").join("\n")+"\n"
+        output += i + "}while(!("+ tool.toJS(this.condition) +"));"
+        return output
+    },
+    toAST(){
+        return {repeat :{
+            until : tool.toAST(this.condition),
+            body  : tool.bodyToAST(this.body)
+        }}
+    }
+}
+
+function If(condition){
+    this.type = "if"
+    this.condition = condition
+    this.body = []
+    return this
+}
+function ElseIf(condition){
+    this.type = "elseif"
+    this.condition = condition
+    this.body = []
+    return this
+}
+function Else(){
+    this.type = "else"
+    this.body = []
+    return this
+}
+
+/**
+ * Creates a if-elseif?-else? block
+ * add a condition with addCondition. The first one is the main if, the next ones are elseifs.
+ * add an else with addElse.
+ */
+
+function Branch(){
+    this.type = "branch"
+    return this
+}
+
+Branch.prototype = {
+    isStatement : F_TRUE,
+    /**
+     * Adds a condition to this branch. If the branch is empty, adds an If. 
+     * If it's not empty, adds an ElseIf.
+     * To add an Else, use addElse.
+     * @param {Expression} condition 
+     * @returns an if or elseif node
+     */
+    addCondition(condition){
+        // if vazio
+        if(!this.chain){
+            let _if = new If(condition)
+            this.chain = []
+            this.chain.push(_if)
+            return _if
+        }else{
+            let elseif = new ElseIf(condition)
+            this.chain.push(elseif)
+            return elseif
+        }
+    },
+    addElse(){
+        if(!this.chain){
+            throw "Não dá pra adicionar else em um if sem cabeça."
+        }
+        let _else = new Else()
+        this.chain.push(_else)
+        return _else
+    },
+
+    getHead(){
+        return this.chain[0]
+    },
+    getMid(i){
+        return this.chain[ i +1 ]
+    },
+    getTail(){
+        return this.chain[ this.chain.length -1 ]
+    },
+
+    toAST(){
+        let r = {}
+        let c = 0
+        this.chain.forEach( el =>{
+            switch(el.type){
+                case "if" :{
+                    r["if"] = {
+                        condition : tool.toAST(el.condition),
+                        body      : tool.bodyToAST(el.body)
+                    }
+                }break
+                case "elseif" :{
+                    r["elseif_"+(c++)] = {
+                        condition : tool.toAST(el.condition),
+                        body      : tool.bodyToAST(el.body)
+                    }
+                }break
+                case "else" :{
+                    r["else"] = {
+                        body : tool.bodyToAST(el.body)
+                    }
+                }
+            }
+        })
+        return { branch : r}        
+    },
+    toC(nivel){
+        let output = ""
+        let i = tool.indent(nivel)
+        this.chain.forEach( el =>{
+            output += i
+            switch(el.type){
+                case "if" :{
+                    output += "if(" + tool.toC(el.condition,0) + "){\n"
+                } break
+                case "elseif" :{
+                    output += "else if(" + tool.toC(el.condition,0) + "){\n"
+                } break
+                case "else" : {
+                    output += "else {\n"
+                }
+            }
+            output += el.body.map( s => tool.toC(s, nivel+1) + ";").join("\n")+"\n" + i + "}"
+        })
+        return output
+    },
+    toJS(nivel){
+        let output = ""
+        let i = tool.indent(nivel)
+        this.chain.forEach( el =>{
+            output += i
+            switch(el.type){
+                case "if" :{
+                    output += "if(" + tool.toJS(el.condition, 0) + "){\n"
+                } break
+                case "elseif":{
+                    output += "else if("+tool.toJS(el.condition,0) + "){\n"
+                } break
+                case "else":{
+                    output += "else {\n"
+                }
+            }
+            output += el.body.map( s => tool.toJS(s, nivel+1) + ";").join("\n")+"\n" + i + "}"
+        })
         return output
     }
 }
@@ -233,7 +384,13 @@ function Binary(a, op, b){
 }
 Binary.prototype = {
     toAST(){
-        return "blah"
+        return { 
+            binary :{
+                a : tool.toAST(this.a),
+                op: this.op,
+                b : tool.toAST(this.b)
+            }
+        }
     },
     toC(nivel){
         return tool.toC(this.a) + this.op + tool.toC(this.b)
@@ -246,11 +403,10 @@ Binary.prototype = {
 
 function argList (expList){
     let list = []
-    if(expList){
-        if(expList.exp()){
+    if(expList)
+        if(expList.exp())
             list = expList.exp().map( e => visit.Expression(e ))
-        }
-    }
+        
     return list
 }
 
@@ -339,8 +495,8 @@ const visit = {
    | postfixExpression *
    | conditional //
    | for_loop //
-   | while_loop //
-   | repeat_loop //
+   | while_loop *
+   | repeat_loop // *
    | for_each_loop //
    | think_loop // 
    | range_loop
@@ -357,10 +513,15 @@ const visit = {
         // x()
         if(s.postfixExpression())
             return visit.Postfix(s.postfixExpression())
-
+        // if x
+        if(s.conditional())
+            return visit.If(s.conditional())
         // while x: end
         if(s.while_loop())
             return visit.While(s.while_loop())
+        // repeat: until x
+        if(s.repeat_loop())
+            return visit.Repeat(s.repeat_loop())
     },
 
     Assignment(a){
@@ -388,12 +549,23 @@ const visit = {
         // condição
         // corpo
         Node.pushNode(_while)
-        visit.Body(w.body()).forEach( s =>{
+        visit.Body(w.body()).forEach( s =>
             Node.addChild(s)
-        })
+        )
         Node.popNode()
         
         return _while
+    },
+    Repeat(r){
+        let _repeat = new Repeat(visit.Expression(r.exp()))
+        // corpo
+        // condição
+        Node.pushNode(_repeat)
+        visit.Body(r.body()).forEach( s =>
+            Node.addChild(s)    
+        )
+        Node.popNode()
+        return _repeat
     },
     
     /*
@@ -449,6 +621,44 @@ const visit = {
         }    
         return undefined
     },
+
+    If(ifContext){
+        let branch = new Branch()
+        let body_counter = 0
+
+        ifContext.exp().forEach( e =>{
+            // adiciona essa condição...
+            let part = branch.addCondition( visit.Expression(e) )
+            // adiciona o corpo dessa condição...
+            if(ifContext.body(body_counter)){
+                Node.pushNode(part)
+                visit.Body( ifContext.body(body_counter) ).forEach( 
+                    statement =>{ 
+                        Node.addChild( statement ) 
+                    }
+                )
+                Node.popNode()
+            }
+            body_counter++
+        })
+
+        // coloca o corpo do else...
+        if(ifContext.if_else()){
+            let part = branch.addElse()
+            // adiciona o corpo do else
+            if(ifContext.body(body_counter)){
+                Node.pushNode(part)
+                visit.Body(ifContext.body(body_counter)).forEach( 
+                    statement =>{
+                        Node.addChild(statement)
+                    }
+                )
+                Node.popNode()
+            }
+        }
+
+        return branch
+    },
     Expression(e){
         const A = x => visit.Expression( e.exp(0) ),
               B = x => visit.Expression( e.exp(1) ),
@@ -494,9 +704,10 @@ function Call(w, args){
 Call.prototype = {
     isStatement : F_TRUE,
     toAST(){
-        return [tool.toAST(this.what),
-            this.args.map( a => tool.toAST(a))
-           ]
+        return  {
+            call : tool.toAST(this.what),
+            args : this.args.map( a => tool.toAST(a))
+        }
     },
     toC(nivel){
         let args = this.args.map( a => tool.toC(a) ).join(",")
@@ -517,16 +728,19 @@ Call.prototype = {
 */
 function Var(name){
     this.type = "var"
-    this.name = name.toLowerCase()
+    this.name = name // name.toLowerCase()
     return this
 }
-Var.prototype.toAST = function(){
-    return {var : this.name}
-}
-Var.prototype.toC = 
-Var.prototype.toJS =
-function(nivel){
-    return this.name
+Var.prototype={
+    toAST(){
+        return {var : this.name}
+    },
+    toC(){
+        return this.name
+    },
+    toJS(){
+        return this.name
+    }
 }
 
 function Index(owner, index){
@@ -534,22 +748,19 @@ function Index(owner, index){
     this.owner = owner
     this.index = index
 }
-
-Index.prototype.toC =
-function(nivel){
-    return tool.toC(this.owner) + "[" + tool.toC(this.index) + "]"
+Index.prototype = {
+    toC(nivel){
+        return tool.toC(this.owner) + "[" + tool.toC(this.index) + "]"
+    },
+    toJS(nivel){
+        return tool.toJS(this.owner) + "[" + tool.toJS(this.index) + "]"
+    },
+    toAST(){
+        return {index : {owner   : tool.toAST(this.owner) , 
+                         element : tool.toAST(this.index) }}
+    }
 }
 
-Index.prototype.toJS = 
-function(nivel){
-    return tool.toJS(this.owner) + "[" + tool.toJS(this.index) + "]"
-}
-
-Index.prototype.toAST = 
-function(){
-    return {index : {owner   : tool.toAST(this.owner) , 
-                     element : tool.toAST(this.index) }}
-}
 
 function Property(owner, op, field){
     this.type = "property"
@@ -558,24 +769,22 @@ function Property(owner, op, field){
     this.op   = op
     return this
 }
-
-Property.prototype.toAST = function(){
-    return {property : {owner : tool.toAST(this.owner),
-            field : tool.toAST(this.field)}}
+Property.prototype = {
+    toAST(){
+        return {property : {owner : tool.toAST(this.owner),
+                field : tool.toAST(this.field)}}
+    },
+    isStatement(){
+        return tool.isStatement(this.field)
+    },
+    toC(nivel){
+        return tool.indent(nivel) + tool.toC(this.owner) + this.op + tool.toC(this.field)
+    },
+    toJS(nivel){
+        return tool.indent(nivel) + tool.toJS(this.owner) + "." + tool.toJS(this.field)
+    }
 }
 
-Property.prototype.isStatement = function(){
-    return tool.isStatement(this.field)
-}
-
-Property.prototype.toC =
-function(nivel){
-    return tool.indent(nivel) + tool.toC(this.owner) + this.op + tool.toC(this.field)
-}
-Property.prototype.toJS = 
-function(nivel){
-    return tool.indent(nivel) + tool.toJS(this.owner) + "." + tool.toJS(this.field)
-}
 
 const jsonFormat = require('json-format')
 
@@ -593,11 +802,12 @@ let formatted = jsonFormat(programa.toAST(),{
 escreve("ast.json"   , formatted)
 escreve("output.cpp" , programa.toC (0))
 escreve("output.js"  , programa.toJS(0))
+// Ver o que eu tenho que fazer.
+TODOS()
 
 console.log("Executando o gerado...")
 
 eval(programa.toJS(0))
 
 
-// Ver o que eu tenho que fazer.
-TODOS()
+

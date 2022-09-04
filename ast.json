@@ -10,40 +10,112 @@
           "left": {
             "var": "x"
           },
-          "right": 0
+          "right": 2
         }
       },
       {
-        "while": {
-          "condition": "blah",
-          "body": [
-            {
-              "assignment": {
-                "op": "=",
-                "left": {
+        "branch": {
+          "if": {
+            "condition": {
+              "binary": {
+                "a": {
                   "var": "x"
                 },
-                "right": "blah"
+                "op": "==",
+                "b": 1
               }
             },
-            {
-              "property": {
-                "owner": {
-                  "var": "console"
-                },
-                "field": [
-                  {
-                    "var": "log"
+            "body": [
+              {
+                "property": {
+                  "owner": {
+                    "var": "console"
                   },
-                  [
-                    {
-                      "var": "x"
-                    }
-                  ]
-                ]
+                  "field": {
+                    "call": {
+                      "var": "log"
+                    },
+                    "args": [
+                      "X é 1"
+                    ]
+                  }
+                }
+              },
+              {
+                "property": {
+                  "owner": {
+                    "var": "console"
+                  },
+                  "field": {
+                    "call": {
+                      "var": "log"
+                    },
+                    "args": [
+                      "Outra coisa:"
+                    ]
+                  }
+                }
               }
-            }
-          ]
+            ]
+          },
+          "elseif_0": {
+            "condition": {
+              "binary": {
+                "a": {
+                  "var": "x"
+                },
+                "op": "==",
+                "b": 2
+              }
+            },
+            "body": [
+              {
+                "property": {
+                  "owner": {
+                    "var": "console"
+                  },
+                  "field": {
+                    "call": {
+                      "var": "log"
+                    },
+                    "args": [
+                      "X é 2"
+                    ]
+                  }
+                }
+              },
+              {
+                "property": {
+                  "owner": {
+                    "var": "console"
+                  },
+                  "field": {
+                    "call": {
+                      "var": "log"
+                    },
+                    "args": [
+                      "E mais uma coisa..."
+                    ]
+                  }
+                }
+              },
+              {
+                "property": {
+                  "owner": {
+                    "var": "console"
+                  },
+                  "field": {
+                    "call": {
+                      "var": "log"
+                    },
+                    "args": [
+                      "E mais outra coisa..."
+                    ]
+                  }
+                }
+              }
+            ]
+          }
         }
       }
     ]
