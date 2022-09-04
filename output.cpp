@@ -1,3 +1,7 @@
 int main(){
- a=x[3];
+ x=0;
+ while(x<10){
+  x=x+1;
+  console.log(x);
+ };
 }
