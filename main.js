@@ -262,24 +262,13 @@ Branch.prototype = {
         }
     },
     addElse(){
-        if(!this.chain){
+        if(!this.chain)
             throw "Não dá pra adicionar else em um if sem cabeça."
-        }
+
         let _else = new Else()
         this.chain.push(_else)
         return _else
     },
-
-    getHead(){
-        return this.chain[0]
-    },
-    getMid(i){
-        return this.chain[ i +1 ]
-    },
-    getTail(){
-        return this.chain[ this.chain.length -1 ]
-    },
-
     toAST(){
         let r = {}
         let c = 0
@@ -310,16 +299,15 @@ Branch.prototype = {
         let output = ""
         let i = tool.indent(nivel)
         this.chain.forEach( el =>{
-            output += i
             switch(el.type){
                 case "if" :{
-                    output += "if(" + tool.toC(el.condition,0) + "){\n"
+                    output += i + "if(" + tool.toC(el.condition,0) + "){\n"
                 } break
                 case "elseif" :{
-                    output += "else if(" + tool.toC(el.condition,0) + "){\n"
+                    output += " else if(" + tool.toC(el.condition,0) + "){\n"
                 } break
                 case "else" : {
-                    output += "else {\n"
+                    output += " else {\n"
                 }
             }
             output += el.body.map( s => tool.toC(s, nivel+1) + ";").join("\n")+"\n" + i + "}"
@@ -400,6 +388,38 @@ Binary.prototype = {
     }
 }
 
+/**
+ * Unary expression. Can be -x or !x
+ * @param {Expression} a 
+ * @param {Operator} op 
+ * @returns 
+ */
+function Unary(a, op){
+    this.type = "unary"
+    this.a = a
+    this.op = op
+    return this
+}
+Unary.prototype = {
+    toAST(){
+        return {
+            [this.op] : tool.toAST(this.a)
+        }
+    },
+    toC(nivel){
+        if(this.a.type == "parentheses")
+            return this.op + tool.toC(this.a)
+        else
+            return this.op + "(" + tool.toC(this.a) +")"
+    },
+    toJS(nivel){
+        if(this.a.type == "parentheses")
+            return this.op + tool.toJS(this.a)
+        else
+            return this.op + "(" + tool.toC(this.a) + ")"
+        
+    }
+}
 
 function argList (expList){
     let list = []
@@ -502,10 +522,13 @@ const visit = {
    | range_loop
    | labelDef
    | gotoJump
-   | breakLoop
-   | continueLoop
-   | retStatement
+   | breakLoop *
+   | continueLoop *
+   | retStatement * 
 */
+        // tipo x = valor
+        if(s.declaration())
+            return visit.Declaration(s.declaration())
         // x = y
         if(s.assignment())
             return visit.Assignment(s.assignment())
@@ -522,8 +545,38 @@ const visit = {
         // repeat: until x
         if(s.repeat_loop())
             return visit.Repeat(s.repeat_loop())
-    },
 
+        // break
+        if(s.breakLoop())
+            return new Break()
+        // continue
+        if(s.continueLoop())
+            return new Continue()
+
+        // return x
+        if(s.retStatement()){
+            if(s.retStatement().exp()){
+                return new Return( visit.Expression( s.retStatement().exp() ))
+            }else{
+                return new Return()
+            }
+        }
+    },
+    Type(t){
+        return new Type(t.getText())
+    },
+    Declaration(d){
+        if(d.varDeclaration()){
+            return visit.VarDeclaration( d.varDeclaration())
+        }
+    },
+    VarDeclaration(d){
+        const type = visit.Type(d.type()),
+        // pra cada var decl unit
+                identifier = visit.Identifier( d.varDecUnit(0).identifier() )
+
+        return new VarDeclaration(new Var(identifier), new Type(type), null)
+    },
     Assignment(a){
         // assignment sempre é múltiplo.
         const 
@@ -659,11 +712,25 @@ const visit = {
 
         return branch
     },
+    /**
+     * 
+     * @param {*} e 
+     * @returns Numeric, Text, Binary, 
+     */
     Expression(e){
         const A = x => visit.Expression( e.exp(0) ),
               B = x => visit.Expression( e.exp(1) ),
               bin = (a, o, b) => new Binary(a, o, b)
-
+        // -x, !x
+        if(e.unary()){
+            return new Unary(A(), e.unary().getText())
+        }
+        // ( expressão )
+        // this is just
+        if(e.L_PAR() && e.R_PAR()){
+            return new Parentheses( A() )
+        }
+        // expressões binárias
         for (p of [
             [   () => e.postfixExpression(), 
                 () => visit.Postfix(e.postfixExpression())], // x
@@ -719,6 +786,130 @@ Call.prototype = {
     }
 }
 
+function Return(exp){
+    this.type = "return"
+    this.expression = exp
+    return this
+}
+
+Return.prototype={
+    isStatement : F_TRUE,
+    toAST(){
+        if(this.expression){
+            return {
+                "return" : tool.toAST(this.expression)
+            }
+        }else{
+            return { "return" : "void" }
+        }
+
+    },
+    toC(nivel){
+        let i = tool.indent(nivel)
+        if(this.expression){
+            return i + "return "+tool.toJS(this.expression)
+        }else{
+            return i + "return"
+        }
+    },
+    toJS(nivel){
+        let i = tool.indent(nivel)
+        if(this.expression){
+            return i + "return "+tool.toJS(this.expression)
+        }else{
+            return i + "return"
+        }
+    }
+}
+
+function Continue(){
+    this.type = "continue"
+    return this
+}
+
+Continue.prototype = {
+    isStatement : F_TRUE,
+    toAST(){
+        return "continue"
+    },
+    toC(nivel){
+        return tool.indent(nivel) + "continue";
+    },
+    toJS(nivel){
+        return tool.indent(nivel) + "continue";
+    }
+}
+
+function Break(){
+    this.type = "break"
+    return this
+}
+
+Break.prototype = {
+    isStatement : F_TRUE,
+    toAST(){
+        return "break"
+    },
+    toC(nivel){
+        return tool.indent(nivel) + "break";
+    },
+    toJS(nivel){
+        return tool.indent(nivel) + "break";
+    }
+}
+
+function Type(name){
+    this.name = name
+    return this
+}
+Type.prototype = {
+    toAST(){
+        return this.name
+    },
+    toC(){
+        return this.name
+    },
+    // isso nunca vai ser chamado porque JS tem tipagem dinâmica.
+    // e eu não quero nada de typescript.
+    toJS(){
+        return ""
+    }
+}
+
+function VarDeclaration(variable,type,initializer){
+    this.variable = variable
+    this.type = type
+    this.initializer = initializer
+    return this
+}
+VarDeclaration.prototype = {
+    isStatement   : F_TRUE,
+    isDeclaration : F_TRUE,
+    toAST(){
+        if(this.initializer){
+            return {
+                "var declaration" : {
+                    var : this.variable.name,
+                    type: this.type.name,
+                    initializer : tool.toAST(this.initializer)
+                }
+            }
+        }else{
+            return {
+                "var declaration" : {
+                    var : this.name,
+                    type: this.type
+                }
+            }
+        }
+    },
+    toC(nivel){
+        return tool.indent(nivel) + tool.toC(this.type) + " " + tool.toC(this.variable) + (this.initializer ? " = "+tool.toC(this.initializer) : "" )
+    },
+    toJS(nivel){
+        return tool.indent(nivel) + "let " + tool.toJS(this.variable) + (this.initializer ? " = " + tool.toJS(this.initializer) : "")        
+    }
+}
 
 /*
     Regras:
@@ -785,6 +976,27 @@ Property.prototype = {
     }
 }
 
+/**
+ * Wrapper for (expression) s
+ * @param {Expression} expression 
+ * @returns 
+ */
+function Parentheses( expression ){
+    this.type = "parentheses"
+    this.expression = expression
+    return this
+} 
+Parentheses.prototype = {
+    toAST(){
+        return tool.toAST(this.expression)
+    },
+    toC (nivel){
+        return "(" + tool.toC(this.expression) + ")"
+    },
+    toJS(nivel){
+        return "(" + tool.toJS(this.expression) + ")"
+    }
+}
 
 const jsonFormat = require('json-format')
 

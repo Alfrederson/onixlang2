@@ -9,6 +9,10 @@ grammar onix;
     //_unmatched = []
 }
 
+
+number: BIN | HEX | INT | FLOAT | K_FALSE | K_TRUE;
+string: StringLiteral  ;
+
 program: block*? EOF;
 
 block
@@ -29,24 +33,21 @@ use_directive
 
 statement             
    : declaration //   
-   | assignment //
+   | assignment // ok
    | postfixExpression //
-   | conditional //
+   | conditional // ok
    | for_loop //
-   | while_loop //
-   | repeat_loop //
+   | while_loop // ok
+   | repeat_loop // ok
    | for_each_loop //
    | think_loop // 
    | range_loop
    | labelDef
-   | gotoJump
-   | breakLoop
-   | continueLoop
-   | retStatement
+ //  | gotoJump   // removido na V2
+   | breakLoop    // ok
+   | continueLoop // ok
+   | retStatement // ok
    ;
-
-ext_block: cpp_ext_block | vm_ext_block;
-
 
 
 body: (statement)* ;
@@ -61,12 +62,16 @@ func_def : K_FUNC  type (type PERIOD)? identifier DOUBLE_ARROW exp
 
 func_stub : K_FUNC type (type PERIOD)? identifier parlist? ;
 
-cpp_ext_block: K_CPP COLON (cpp_func_def|cpp_sub_def|cpp_var_def)* K_END;
+// V1
+//cpp_ext_block: K_CPP COLON (cpp_func_def|cpp_sub_def|cpp_var_def)* K_END;
 
-vm_ext_block: K_VM COLON (vm_func_def|vm_sub_def)* K_END;
+// V2
+// V2 permite definir funções específicas para cada runtime
+ext_block: K_EXT string COLON (ext_func_def | ext_sub_def | ext_var_def )* K_END;
 
-// bloco externo c++:
-// cpp:
+
+// bloco externo c++/js/qualquer coisa:
+// ext "vm" / "cpp" / "js"
 //  "nome_cpp": func tipo nome x:int, y:int, z:int
 //  "nome_cpp": func tipo nome x:int, ...
 //  "nome_var_cpp": tipo nome
@@ -74,16 +79,15 @@ vm_ext_block: K_VM COLON (vm_func_def|vm_sub_def)* K_END;
 // fim
 
 // bloco externo vm:
-// vm:
-//   0: func tipo nome x:int, y:int, z:int
-//   0: func tipo nome x:int, ...
+// ext "vm":
+//   "0": func tipo nome x:int, y:int, z:int
+//   "0": func tipo nome x:int, ...
 // fim
 
-cpp_func_def: sub=string COLON func_stub;
-cpp_var_def : sub=string COLON declaration;
+ext_func_id: string|number;
 
-vm_func_def : id=number COLON func_stub;
-
+ext_func_def: sub=ext_func_id COLON func_stub;
+ext_var_def : sub=string COLON declaration;
 
 sub_name : identifier;
 sub_def : K_SUB (type PERIOD)? sub_name COLON  body K_END
@@ -92,19 +96,16 @@ sub_def : K_SUB (type PERIOD)? sub_name COLON  body K_END
 
 sub_stub : K_SUB  sub_name parlist?;
 
-cpp_sub_def: sub=string COLON sub_stub;
-vm_sub_def : id=number COLON sub_stub;
+ext_sub_def: sub=ext_func_id COLON sub_stub;
 
 
 any_args : '...';
 
 labelDef : LABEL COLON ;
-gotoJump : K_GOTO LABEL;
+// gotoJump : K_GOTO LABEL; // REMOVIDO NA V2
 breakLoop: K_BREAK ;
 continueLoop: K_CONTINUE ;
 retStatement: K_RETURN exp;
-
-
 
 par: (type (L_SBRAC R_SBRAC)?)? identifier 
    | identifier COLON type (L_SBRAC R_SBRAC)?
@@ -143,7 +144,7 @@ varDecUnit : (identifier (EQUAL initializer)?);
 varDeclaration : type varDecUnit (COMMA varDecUnit)* ;
 */
 /* V2  */
-varDeclaration : K_VAR type varDecUnit (COMMA varDecUnit)* ;     
+varDeclaration : K_VAR type COLON varDecUnit (COMMA varDecUnit)* ;     
 
 arrayInitializer : L_SBRAC initializer (COMMA initializer)* R_SBRAC ;
 
@@ -157,7 +158,7 @@ arrayDecUnit : identifier L_SBRAC exp R_SBRAC
              | identifier EQUAL arrayInitializer
              ;
 
-arrayDeclaration : K_VAR type arrayDecUnit (COMMA arrayDecUnit)*
+arrayDeclaration : K_VAR type COLON arrayDecUnit (COMMA arrayDecUnit)*
                  ; 
 
 assignmentUnit : postfixExpression;
@@ -186,8 +187,8 @@ postfixExpression
 
 exp  
     : postfixExpression
-    | unary exp
-    | L_PAR exp R_PAR
+    | unary exp              // *
+    | L_PAR exp R_PAR        // *
     | exp multiplicative exp // * 
     | exp additive exp       // * 
     | exp shift exp          // * 
@@ -214,14 +215,17 @@ boolOr  : BOOL_OR;
 
 expList: exp (COMMA exp)* ;    
 
-number: BIN | HEX | INT | FLOAT | K_FALSE | K_TRUE;
 
-string: StringLiteral  ;
 
 Libstring: LESSER_THAN ( CChar+ )*? GREATER_THAN ;
 StringLiteral : DOUBLE_QUOTE ( CChar+ )? DOUBLE_QUOTE;
  
-type : (K_BYTE | K_INT | K_LONG | K_FLOAT | K_STRING | identifier) ADDROP? ;
+// V1
+// type : (K_BYTE | K_INT | K_LONG | K_FLOAT | K_STRING | identifier) ADDROP? ;
+
+// V2
+type : identifier ADDROP? ;
+
 unary: MINUS | NEGATION ;
 
 fragment A : [aA];
@@ -312,7 +316,7 @@ fragment
 
 // É difícil de ler isso
 
-K_GOTO : G O T O | P U L A R ;
+// K_GOTO : G O T O | P U L A R ; // REMOVIDO NA V2
 
 K_AS : A S | C O M O;
 
@@ -358,9 +362,11 @@ K_REPEAT : R E P E A T
 K_UNTIL : U N T I L 
         | A T E;
 K_VM : V M ;
-K_CPP : C P P;
-K_CPP_VAR : V A R;
 
+
+//K_CPP : C P P;
+
+K_EXT : E X T ;
 
 
 K_IF : I F 
@@ -384,13 +390,15 @@ K_FALSE: F A L S E
 K_TRUE: T R U E | O N | H I G H | V E R D A D E I R O | L I G A D O;
 
 
+/* 
+Removido na V2. Agora declaração segue o formato VAR TIPO: x, y, z
 K_BYTE: B Y T E;
 K_INT: I N T E I R O | I N T;
 K_LONG: L O N G O  | L O N G ;
 K_FLOAT: R E A L | F L O A T ;
 K_STRING: S T R I N G 
         | T E X T O;
-
+*/
 
 fragment
 EscapeSequence

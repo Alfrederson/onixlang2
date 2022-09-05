@@ -5,114 +5,37 @@
     "declarations": [],
     "body": [
       {
-        "assignment": {
-          "op": "=",
-          "left": {
-            "var": "x"
-          },
-          "right": 2
+        "declare var": {
+          "type": {
+            "name": {
+              "name": "i32"
+            }
+          }
         }
       },
       {
-        "branch": {
-          "if": {
-            "condition": {
-              "binary": {
-                "a": {
-                  "var": "x"
-                },
-                "op": "==",
-                "b": 1
-              }
-            },
-            "body": [
-              {
-                "property": {
-                  "owner": {
-                    "var": "console"
-                  },
-                  "field": {
-                    "call": {
-                      "var": "log"
-                    },
-                    "args": [
-                      "X é 1"
-                    ]
-                  }
-                }
-              },
-              {
-                "property": {
-                  "owner": {
-                    "var": "console"
-                  },
-                  "field": {
-                    "call": {
-                      "var": "log"
-                    },
-                    "args": [
-                      "Outra coisa:"
-                    ]
-                  }
-                }
-              }
-            ]
+        "assignment": {
+          "op": "=",
+          "left": {
+            "var": "y"
           },
-          "elseif_0": {
-            "condition": {
-              "binary": {
-                "a": {
-                  "var": "x"
-                },
-                "op": "==",
-                "b": 2
-              }
+          "right": {
+            "var": "x"
+          }
+        }
+      },
+      {
+        "property": {
+          "owner": {
+            "var": "console"
+          },
+          "field": {
+            "call": {
+              "var": "log"
             },
-            "body": [
+            "args": [
               {
-                "property": {
-                  "owner": {
-                    "var": "console"
-                  },
-                  "field": {
-                    "call": {
-                      "var": "log"
-                    },
-                    "args": [
-                      "X é 2"
-                    ]
-                  }
-                }
-              },
-              {
-                "property": {
-                  "owner": {
-                    "var": "console"
-                  },
-                  "field": {
-                    "call": {
-                      "var": "log"
-                    },
-                    "args": [
-                      "E mais uma coisa..."
-                    ]
-                  }
-                }
-              },
-              {
-                "property": {
-                  "owner": {
-                    "var": "console"
-                  },
-                  "field": {
-                    "call": {
-                      "var": "log"
-                    },
-                    "args": [
-                      "E mais outra coisa..."
-                    ]
-                  }
-                }
+                "var": "y"
               }
             ]
           }

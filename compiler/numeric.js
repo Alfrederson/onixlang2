@@ -9,7 +9,7 @@ Numeric.prototype.toAST = function(){
 }
 
 Numeric.prototype.toC = function(nivel){
-    return this.value.raw
+    return this.value.val
 }
 
 Numeric.prototype.toJS = function(nivel){
