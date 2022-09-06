@@ -1,5 +1,25 @@
-var i32: x = 0
+global i32: times = 0
 
-y = x
+sub bark:
+    console.log("The doggy went:")
+    barks = 10
+    while barks > 0:
+        barks = barks -1
+        console.log("WOOF!")
+        times = times + 1
+        if times == 1:
+            console.log("First woof")
+        else if times == 2:
+            console.log("Second woof")
+        else if times == 3:
+            console.log("Third woof")
+        else:
+            console.log("SHUT UP, DOG")
+        end
+    end
+end
 
-console.log(y)
+bark()
+
+console.log("The dog barked "+times+" times!")
+console.log("This is an example of side effect")

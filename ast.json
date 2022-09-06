@@ -1,11 +1,216 @@
 {
   "program": {
     "records": [],
-    "functions": [],
+    "functions": [
+      {
+        "function": {
+          "name": "bark",
+          "returns": "void",
+          "arguments": [],
+          "body": [
+            {
+              "property": {
+                "owner": {
+                  "var": "console"
+                },
+                "field": {
+                  "call": {
+                    "var": "log"
+                  },
+                  "args": [
+                    "The doggy went:"
+                  ]
+                }
+              }
+            },
+            {
+              "assignment": {
+                "op": "=",
+                "left": {
+                  "var": "barks"
+                },
+                "right": 10
+              }
+            },
+            {
+              "while": {
+                "condition": {
+                  "binary": {
+                    "a": {
+                      "var": "barks"
+                    },
+                    "op": ">",
+                    "b": 0
+                  }
+                },
+                "body": [
+                  {
+                    "assignment": {
+                      "op": "=",
+                      "left": {
+                        "var": "barks"
+                      },
+                      "right": {
+                        "binary": {
+                          "a": {
+                            "var": "barks"
+                          },
+                          "op": "-",
+                          "b": 1
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "property": {
+                      "owner": {
+                        "var": "console"
+                      },
+                      "field": {
+                        "call": {
+                          "var": "log"
+                        },
+                        "args": [
+                          "WOOF!"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "assignment": {
+                      "op": "=",
+                      "left": {
+                        "var": "times"
+                      },
+                      "right": {
+                        "binary": {
+                          "a": {
+                            "var": "times"
+                          },
+                          "op": "+",
+                          "b": 1
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "branch": {
+                      "if": {
+                        "condition": {
+                          "binary": {
+                            "a": {
+                              "var": "times"
+                            },
+                            "op": "==",
+                            "b": 1
+                          }
+                        },
+                        "body": [
+                          {
+                            "property": {
+                              "owner": {
+                                "var": "console"
+                              },
+                              "field": {
+                                "call": {
+                                  "var": "log"
+                                },
+                                "args": [
+                                  "First woof"
+                                ]
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "elseif_0": {
+                        "condition": {
+                          "binary": {
+                            "a": {
+                              "var": "times"
+                            },
+                            "op": "==",
+                            "b": 2
+                          }
+                        },
+                        "body": [
+                          {
+                            "property": {
+                              "owner": {
+                                "var": "console"
+                              },
+                              "field": {
+                                "call": {
+                                  "var": "log"
+                                },
+                                "args": [
+                                  "Second woof"
+                                ]
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "elseif_1": {
+                        "condition": {
+                          "binary": {
+                            "a": {
+                              "var": "times"
+                            },
+                            "op": "==",
+                            "b": 3
+                          }
+                        },
+                        "body": [
+                          {
+                            "property": {
+                              "owner": {
+                                "var": "console"
+                              },
+                              "field": {
+                                "call": {
+                                  "var": "log"
+                                },
+                                "args": [
+                                  "Third woof"
+                                ]
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "else": {
+                        "body": [
+                          {
+                            "property": {
+                              "owner": {
+                                "var": "console"
+                              },
+                              "field": {
+                                "call": {
+                                  "var": "log"
+                                },
+                                "args": [
+                                  "SHUT UP, DOG"
+                                ]
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ],
     "declarations": [],
     "body": [
       {
-        "declare var": {
+        "var declaration": {
           "type": {
             "name": {
               "name": "i32"
@@ -14,13 +219,37 @@
         }
       },
       {
-        "assignment": {
-          "op": "=",
-          "left": {
-            "var": "y"
+        "call": {
+          "var": "bark"
+        },
+        "args": []
+      },
+      {
+        "property": {
+          "owner": {
+            "var": "console"
           },
-          "right": {
-            "var": "x"
+          "field": {
+            "call": {
+              "var": "log"
+            },
+            "args": [
+              {
+                "binary": {
+                  "a": {
+                    "binary": {
+                      "a": "The dog barked ",
+                      "op": "+",
+                      "b": {
+                        "var": "times"
+                      }
+                    }
+                  },
+                  "op": "+",
+                  "b": " times!"
+                }
+              }
+            ]
           }
         }
       },
@@ -34,9 +263,7 @@
               "var": "log"
             },
             "args": [
-              {
-                "var": "y"
-              }
+              "This is an example of side effect"
             ]
           }
         }

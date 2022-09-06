@@ -1,5 +1,6 @@
 int main(){
- [object Object] x;
- y=x;
- console.log(y);
+ [object Object] times;
+ bark();
+ console.log("The dog barked "+times+" times!");
+ console.log("This is an example of side effect");
 }

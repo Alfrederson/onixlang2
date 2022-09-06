@@ -39,6 +39,8 @@ const escreve = (path, texto) => fs.writeFileSync(path,texto)
 
 const tool = {
 
+    isArray : (v) => v.constructor.name === "Array",
+
     indent(nivel){
         return " ".repeat(nivel)
     },
@@ -106,13 +108,27 @@ function Program(){
     this.type = "program"
     this.records = [],
     this.functions= [],
-    this.declarations= [],
+    this.declarations= [], // provavelmente isso não existir aqui, sendo criado só na primeira passada do compilador.
     this.body = []
     
     return this
 }
 
 Program.prototype = {
+    addChild(node){
+        if(node.isFunctionDefinition){
+            this.functions.push(node)
+        }else{
+            // Abstrair body pra fazer essa checagem automaticamente?
+            if(tool.isArray(node)){
+                console.log("Adicionando vários nós.")
+                node.forEach( n => this.body.push(n) )
+            }else{
+                this.body.push(node)
+            }
+            
+        }
+    },
     toAST(){
         return { program : {
             records      : this.records     .map( c => tool.toAST(c)),
@@ -131,7 +147,11 @@ Program.prototype = {
         return output
     },
     toJS(nivel){
-        let output = "function main(){\n"
+        // para cada função...
+        let output = 
+        this.functions.map( c=> tool.toJS(c) ).join("\n")
+
+        output += "function main(){\n"
     
         this.body.forEach( c => {
             // JS não deixa fazer isso. Tem que filtrar.
@@ -141,10 +161,61 @@ Program.prototype = {
     
         output += "}\n"
         output += "main()"
+
         return output
     }
 }
 
+/**
+ * User Function definition.
+ * function if return type is set.
+ * sub      if return type is undefined.
+ * method for type X if structType is X, otherwise it's a function in the specified program/library
+ * @param {Argument[]} arguments 
+ * @param {Type} returnType 
+ * @param {Type} structType 
+ * @returns 
+ */
+function UserFunction(name, arguments, returnType, structType){
+    this.type = "function"
+    this.name = name
+    this.returnType = returnType
+    this.structType = structType
+    this.arguments = arguments || []
+    this.declarations = []
+    this.body = []
+
+    return this
+}
+
+UserFunction.prototype = {
+    isFunctionDefinition : true,
+
+    toAST(){
+        return { "function" : {
+            name     : this.name,
+            returns  : this.returnType ? tool.toAST(this.returnType) : "void",
+            arguments: tool.bodyToAST(this.arguments),
+            body     : tool.bodyToAST(this.body) 
+        }}
+    },
+    toJS(nivel){
+        // literalmente idêntico ao do program com algumas poucas diferenças.
+        let output = "function "+this.name+"(){\n"
+    
+        this.body.forEach( c => {
+            // JS não deixa fazer isso. Tem que filtrar.
+            if(tool.isStatement(c))
+                output += tool.toJS(c, nivel+1) + ";\n"
+        })
+        output += "}\n"
+
+        return output
+    },
+    toC(nivel){
+        return "void "+this.name+"(){ }\n"
+    }
+}
 
 
 function While(condition){
@@ -274,23 +345,23 @@ Branch.prototype = {
         let c = 0
         this.chain.forEach( el =>{
             switch(el.type){
-                case "if" :{
+                case "if" :
                     r["if"] = {
                         condition : tool.toAST(el.condition),
                         body      : tool.bodyToAST(el.body)
                     }
-                }break
-                case "elseif" :{
+                break
+                case "elseif" :
                     r["elseif_"+(c++)] = {
                         condition : tool.toAST(el.condition),
                         body      : tool.bodyToAST(el.body)
                     }
-                }break
-                case "else" :{
+                break
+                case "else" :
                     r["else"] = {
                         body : tool.bodyToAST(el.body)
                     }
-                }
+                
             }
         })
         return { branch : r}        
@@ -304,13 +375,13 @@ Branch.prototype = {
                     output += i + "if(" + tool.toC(el.condition,0) + "){\n"
                 } break
                 case "elseif" :{
-                    output += " else if(" + tool.toC(el.condition,0) + "){\n"
+                    output += "else if(" + tool.toC(el.condition,0) + "){\n"
                 } break
                 case "else" : {
-                    output += " else {\n"
+                    output += "else{\n"
                 }
             }
-            output += el.body.map( s => tool.toC(s, nivel+1) + ";").join("\n")+"\n" + i + "}"
+            output += el.body.map( s => tool.toC(s, nivel+1) + ";").join("\n")+"\n"  + "}"
         })
         return output
     },
@@ -318,16 +389,16 @@ Branch.prototype = {
         let output = ""
         let i = tool.indent(nivel)
         this.chain.forEach( el =>{
-            output += i
+            // output += i
             switch(el.type){
                 case "if" :{
-                    output += "if(" + tool.toJS(el.condition, 0) + "){\n"
+                    output += i+ "if(" + tool.toJS(el.condition, 0) + "){\n"
                 } break
                 case "elseif":{
                     output += "else if("+tool.toJS(el.condition,0) + "){\n"
                 } break
                 case "else":{
-                    output += "else {\n"
+                    output += "else{\n"
                 }
             }
             output += el.body.map( s => tool.toJS(s, nivel+1) + ";").join("\n")+"\n" + i + "}"
@@ -338,6 +409,9 @@ Branch.prototype = {
 
 
 function Assignment(left, op, right){
+    if(op === "é" || op === "É")
+        op = "="
+
     this.type = "assignment"
     this.left = left
     this.right = right
@@ -364,6 +438,7 @@ Assignment.prototype = {
 }
 
 function Binary(a, op, b){
+
     this.type = "binary"
     this.a = a
     this.op = op
@@ -434,13 +509,9 @@ const visit = {
     Program(context){
         let program =new Program()
 
-        Node.pushNode(program)
-
-        context.children.forEach( block => 
-            Node.addChild(visit.Block(block))   
+        context.block().forEach( block =>
+            Node.addChild(program, visit.Block(block))    
         )
-
-        Node.popNode()
 
         return program
     },
@@ -453,7 +524,6 @@ const visit = {
         // 1234.56 -> racional, é sempre um f32
         let t = i.getText()
         TODO("Detectar o tamanho do inteiro para a VM ficar feliz.")
-
         for(let par of [
             [i.BIN(), () =>({
                 type : "bin",
@@ -500,11 +570,45 @@ const visit = {
         Blocos
     */
     Block(b){
-        if(b.statement){
+        // desgraçado se enfia aqui.
+        if(b.getText() === "<EOF>") return undefined
+        
+        if(b.statement()){
             return visit.Statement(b.statement())
         }
+        if(b.sub_def()){
+            return visit.UserSub(b.sub_def())
+        }
+        if(b.func_def()){
+            return visit.UserFunction(b.func_def())
+        }
     },
+    /**
+     * Extracts a UserFunction definition from a sub_def context.
+     * @param {sub_def} sub def context 
+     * @returns 
+     */
+    UserSub(sub){
+        // sub_name não é do "tipo" identifier, mas isso é válido
+        // porque sub_name implementa o método getTest(), que é o que eu preciso.
 
+        let funcName = visit.Identifier(sub.sub_name())
+
+        let ownerType
+        if(sub.type()){
+            ownerType = visit.Type(sub.type())
+            console.log("Método de "+ownerType.name)
+        }
+
+        let userSub = new UserFunction(funcName)
+
+        Node.addChild( userSub, visit.Body( sub.body() ))
+
+        return userSub
+    },
+    UserFunction(sub){
+
+    },
     /*
         Instruções
     */
@@ -598,26 +702,21 @@ const visit = {
     },
     
     While(w){
-        let _while = new While(visit.Expression(w.exp()))
         // condição
-        // corpo
-        Node.pushNode(_while)
-        visit.Body(w.body()).forEach( s =>
-            Node.addChild(s)
-        )
-        Node.popNode()
+        let _while = new While(visit.Expression(w.exp()))
         
+        // corpo
+        Node.addChild(_while, visit.Body(w.body()))
+
         return _while
     },
     Repeat(r){
+
+        // condição
         let _repeat = new Repeat(visit.Expression(r.exp()))
         // corpo
-        // condição
-        Node.pushNode(_repeat)
-        visit.Body(r.body()).forEach( s =>
-            Node.addChild(s)    
-        )
-        Node.popNode()
+        Node.addChild(_repeat, visit.Body(r.body()))
+
         return _repeat
     },
     
@@ -684,13 +783,7 @@ const visit = {
             let part = branch.addCondition( visit.Expression(e) )
             // adiciona o corpo dessa condição...
             if(ifContext.body(body_counter)){
-                Node.pushNode(part)
-                visit.Body( ifContext.body(body_counter) ).forEach( 
-                    statement =>{ 
-                        Node.addChild( statement ) 
-                    }
-                )
-                Node.popNode()
+                Node.addChild( part, visit.Body( ifContext.body(body_counter)) )
             }
             body_counter++
         })
@@ -700,13 +793,7 @@ const visit = {
             let part = branch.addElse()
             // adiciona o corpo do else
             if(ifContext.body(body_counter)){
-                Node.pushNode(part)
-                visit.Body(ifContext.body(body_counter)).forEach( 
-                    statement =>{
-                        Node.addChild(statement)
-                    }
-                )
-                Node.popNode()
+               Node.addChild( part, visit.Body(ifContext.body(body_counter)) )
             }
         }
 
@@ -740,7 +827,7 @@ const visit = {
     
             [   () => e.additive(),
                 () => bin(A(e), e.additive().getText(), B(e)) ], // x + y
-            
+
             [   () => e.shift()     ,() => bin(A(e), e.shift().getText(), B(e) )], // x >> y, x << y
             [   () => e.relational(),() => bin(A(e), e.relational().getText(), B(e) )], // x > y, x < y
             [   () => e.equality()  ,() => bin(A(e), e.equality().getText(), B(e) )], // x == y, x != y

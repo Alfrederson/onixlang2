@@ -32,7 +32,7 @@ use_directive
     ;
 
 statement             
-   : declaration //   
+   : declaration // var ok array falta  
    | assignment // ok
    | postfixExpression //
    | conditional // ok
@@ -42,7 +42,7 @@ statement
    | for_each_loop //
    | think_loop // 
    | range_loop
-   | labelDef
+ //  | labelDef   // removido na V2
  //  | gotoJump   // removido na V2
    | breakLoop    // ok
    | continueLoop // ok
@@ -101,11 +101,12 @@ ext_sub_def: sub=ext_func_id COLON sub_stub;
 
 any_args : '...';
 
-labelDef : LABEL COLON ;
+// labelDef : LABEL COLON ; // REMOVIDO NA V2
 // gotoJump : K_GOTO LABEL; // REMOVIDO NA V2
+
 breakLoop: K_BREAK ;
 continueLoop: K_CONTINUE ;
-retStatement: K_RETURN exp;
+retStatement: K_RETURN exp?;
 
 par: (type (L_SBRAC R_SBRAC)?)? identifier 
    | identifier COLON type (L_SBRAC R_SBRAC)?
@@ -144,7 +145,7 @@ varDecUnit : (identifier (EQUAL initializer)?);
 varDeclaration : type varDecUnit (COMMA varDecUnit)* ;
 */
 /* V2  */
-varDeclaration : K_VAR type COLON varDecUnit (COMMA varDecUnit)* ;     
+varDeclaration : (K_VAR|K_GLOBAL) type COLON varDecUnit (COMMA varDecUnit)* ;     
 
 arrayInitializer : L_SBRAC initializer (COMMA initializer)* R_SBRAC ;
 
@@ -158,7 +159,7 @@ arrayDecUnit : identifier L_SBRAC exp R_SBRAC
              | identifier EQUAL arrayInitializer
              ;
 
-arrayDeclaration : K_VAR type COLON arrayDecUnit (COMMA arrayDecUnit)*
+arrayDeclaration : (K_VAR|K_GLOBAL) type COLON arrayDecUnit (COMMA arrayDecUnit)*
                  ; 
 
 assignmentUnit : postfixExpression;
@@ -199,7 +200,7 @@ exp
     | exp bitOr exp          // * 
     | exp boolAnd exp        // * 
     | exp boolOr exp         // * 
-    | exp K_AS type 
+    | exp K_AS type          // não sei o que eu faço com isso
     ;
 
 multiplicative: DIV | MOD | MULT;
@@ -289,8 +290,8 @@ OR_ASSIGN : '|=';
 
 ADDROP: '@';
 
-BOOL_AND: ('&&' | A N D | E);
-BOOL_OR : ('||' | O R | O U);
+BOOL_AND: ('&&' | A N D );
+BOOL_OR : ('||' | O R );
 BITWISE_AND: '&';
 BITWISE_OR: '|';
 BITWISE_XOR: '^';
@@ -337,6 +338,7 @@ K_CONST : C O N S T | C O N S T A N T E;
 
 // V2
 K_VAR   : V A R ;
+K_GLOBAL : G L O B A L;
 
 K_COUNT : C O U N T 
         | C O N T A R;
@@ -375,8 +377,7 @@ K_ELSE : E L S E
        | S E N A O;
 
 K_END: F I M 
-     | E N D 
-     | SEMI_COLON ;
+     | E N D ;
 
 K_RETURN: R E T U R N 
         | R E T O R N A ;
@@ -410,9 +411,12 @@ CChar
     | EscapeSequence
     ;
 
+/* 
+REMOVIDO NA V2
 LABEL
     : [@][a-zA-Z][a-zA-Z_0-9]*
     ;
+*/
 
 NAME
     : [a-zA-Z][a-zA-Z_0-9]*
