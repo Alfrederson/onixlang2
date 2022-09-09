@@ -4,7 +4,7 @@ function Text(str){
     return this
 }
 Text.prototype.toAST = function(){
-    return this.value
+    return {text : this.value}
 }
 Text.prototype.toC = 
 Text.prototype.toJS = 

@@ -1,6 +1,15 @@
+let times = 0;
+function fart(loudness,smell){
+ let power_rating = loudness*pow(smell,2);
+}
+
+function somar(a,b){
+ return a+b;
+}
+
 function bark(){
  console.log("The doggy went:");
- barks=10;
+ let barks = 10;
  while(barks>0){
   barks=barks-1;
   console.log("WOOF!");
@@ -17,9 +26,12 @@ function bark(){
  };
 }
 function main(){
- let times;
  bark();
+ x=99;
+ y=99;
+ z=99;
  console.log("The dog barked "+times+" times!");
  console.log("This is an example of side effect");
+ console.log(somar(somar(x,y),z));
 }
 main()

@@ -4,6 +4,82 @@
     "functions": [
       {
         "function": {
+          "name": "fart",
+          "returns": "void",
+          "arguments": [
+            {
+              "type": {
+                "name": "i32"
+              },
+              "name": "loudness"
+            },
+            {
+              "type": {
+                "name": "i32"
+              },
+              "name": "smell"
+            }
+          ],
+          "body": [
+            {
+              "var declaration": {
+                "var": "power_rating",
+                "type": "i32",
+                "initializer": {
+                  "binary": {
+                    "a": {
+                      "var": "loudness"
+                    },
+                    "op": "*",
+                    "b": {
+                      "call": {
+                        "var": "pow"
+                      },
+                      "args": [
+                        {
+                          "var": "smell"
+                        },
+                        2
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "function": {
+          "name": "somar",
+          "returns": "i32",
+          "arguments": [
+            {
+              "name": "a"
+            },
+            {
+              "name": "b"
+            }
+          ],
+          "body": [
+            {
+              "return": {
+                "binary": {
+                  "a": {
+                    "var": "a"
+                  },
+                  "op": "+",
+                  "b": {
+                    "var": "b"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "function": {
           "name": "bark",
           "returns": "void",
           "arguments": [],
@@ -18,18 +94,18 @@
                     "var": "log"
                   },
                   "args": [
-                    "The doggy went:"
+                    {
+                      "text": "The doggy went:"
+                    }
                   ]
                 }
               }
             },
             {
-              "assignment": {
-                "op": "=",
-                "left": {
-                  "var": "barks"
-                },
-                "right": 10
+              "var declaration": {
+                "var": "barks",
+                "type": "i32",
+                "initializer": 10
               }
             },
             {
@@ -71,7 +147,9 @@
                           "var": "log"
                         },
                         "args": [
-                          "WOOF!"
+                          {
+                            "text": "WOOF!"
+                          }
                         ]
                       }
                     }
@@ -116,7 +194,9 @@
                                   "var": "log"
                                 },
                                 "args": [
-                                  "First woof"
+                                  {
+                                    "text": "First woof"
+                                  }
                                 ]
                               }
                             }
@@ -144,7 +224,9 @@
                                   "var": "log"
                                 },
                                 "args": [
-                                  "Second woof"
+                                  {
+                                    "text": "Second woof"
+                                  }
                                 ]
                               }
                             }
@@ -172,7 +254,9 @@
                                   "var": "log"
                                 },
                                 "args": [
-                                  "Third woof"
+                                  {
+                                    "text": "Third woof"
+                                  }
                                 ]
                               }
                             }
@@ -191,7 +275,9 @@
                                   "var": "log"
                                 },
                                 "args": [
-                                  "SHUT UP, DOG"
+                                  {
+                                    "text": "SHUT UP, DOG"
+                                  }
                                 ]
                               }
                             }
@@ -207,22 +293,48 @@
         }
       }
     ],
-    "declarations": [],
-    "body": [
+    "globals": [
       {
         "var declaration": {
-          "type": {
-            "name": {
-              "name": "i32"
-            }
-          }
+          "var": "times",
+          "type": "i32",
+          "initializer": 0
         }
-      },
+      }
+    ],
+    "body": [
       {
         "call": {
           "var": "bark"
         },
         "args": []
+      },
+      {
+        "assignment": {
+          "op": "=",
+          "left": {
+            "var": "x"
+          },
+          "right": 99
+        }
+      },
+      {
+        "assignment": {
+          "op": "=",
+          "left": {
+            "var": "y"
+          },
+          "right": 99
+        }
+      },
+      {
+        "assignment": {
+          "op": "=",
+          "left": {
+            "var": "z"
+          },
+          "right": 99
+        }
       },
       {
         "property": {
@@ -238,7 +350,9 @@
                 "binary": {
                   "a": {
                     "binary": {
-                      "a": "The dog barked ",
+                      "a": {
+                        "text": "The dog barked "
+                      },
                       "op": "+",
                       "b": {
                         "var": "times"
@@ -246,7 +360,9 @@
                     }
                   },
                   "op": "+",
-                  "b": " times!"
+                  "b": {
+                    "text": " times!"
+                  }
                 }
               }
             ]
@@ -263,7 +379,46 @@
               "var": "log"
             },
             "args": [
-              "This is an example of side effect"
+              {
+                "text": "This is an example of side effect"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "property": {
+          "owner": {
+            "var": "console"
+          },
+          "field": {
+            "call": {
+              "var": "log"
+            },
+            "args": [
+              {
+                "call": {
+                  "var": "somar"
+                },
+                "args": [
+                  {
+                    "call": {
+                      "var": "somar"
+                    },
+                    "args": [
+                      {
+                        "var": "x"
+                      },
+                      {
+                        "var": "y"
+                      }
+                    ]
+                  },
+                  {
+                    "var": "z"
+                  }
+                ]
+              }
             ]
           }
         }

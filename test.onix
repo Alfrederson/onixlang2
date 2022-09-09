@@ -1,8 +1,17 @@
-global i32: times = 0
+global i32: times = 0,
+            numeros = [1,2,3,4]
+
+sub fart i32: loudness, i32: smell :
+    var i32: power_rating = loudness * pow(smell,2)
+fim
+
+func i32 somar a,b:
+    retorna a+b
+fim
 
 sub bark:
     console.log("The doggy went:")
-    barks = 10
+    var i32: barks = 10
     while barks > 0:
         barks = barks -1
         console.log("WOOF!")
@@ -21,5 +30,14 @@ end
 
 bark()
 
+
+x,y,z = 99
+
 console.log("The dog barked "+times+" times!")
 console.log("This is an example of side effect")
+
+console.log(
+    somar(
+        somar(x,y),z
+    )
+)

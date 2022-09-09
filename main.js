@@ -38,9 +38,7 @@ const ler = nome => fs.readFileSync(nome).toString()
 const escreve = (path, texto) => fs.writeFileSync(path,texto)
 
 const tool = {
-
-    isArray : (v) => v.constructor.name === "Array",
-
+    isArray : v => v.constructor.name === "Array",
     indent(nivel){
         return " ".repeat(nivel)
     },
@@ -108,6 +106,7 @@ function Program(){
     this.type = "program"
     this.records = [],
     this.functions= [],
+    this.globals  = [],
     this.declarations= [], // provavelmente isso não existir aqui, sendo criado só na primeira passada do compilador.
     this.body = []
     
@@ -118,27 +117,36 @@ Program.prototype = {
     addChild(node){
         if(node.isFunctionDefinition){
             this.functions.push(node)
-        }else{
-            // Abstrair body pra fazer essa checagem automaticamente?
-            if(tool.isArray(node)){
-                console.log("Adicionando vários nós.")
-                node.forEach( n => this.body.push(n) )
-            }else{
-                this.body.push(node)
-            }
-            
+            return
         }
+        if(node.isGlobal){
+            this.globals.push(node)
+            return
+        }
+        
+        // Abstrair body pra fazer essa checagem automaticamente?
+        
+        if(tool.isArray(node)){
+            // isso não é necessário
+            console.log("Adicionando vários nós.")
+            node.forEach( n => this.body.push(n) )
+        }else{
+            this.body.push(node)
+        }
+            
     },
     toAST(){
         return { program : {
             records      : this.records     .map( c => tool.toAST(c)),
             functions    : this.functions   .map( c => tool.toAST(c)),
-            declarations : this.declarations.map( c => tool.toAST(c)),
+            globals      : this.globals.map( c => tool.toAST(c)),
             body         : tool.bodyToAST( this.body)
         }}
     },
     toC(nivel){
-        let output = "int main(){\n"
+        let output =
+            this.globals.map( g => tool.toC(g) + ";\n" ).join("\n")
+        output += "int main(){\n"
         this.body.forEach( c => {
             if(tool.isStatement(c))
                 output += tool.toC(c, nivel+1) + ";\n"
@@ -148,8 +156,10 @@ Program.prototype = {
     },
     toJS(nivel){
         // para cada função...
-        let output = 
-        this.functions.map( c=> tool.toJS(c) ).join("\n")
+        let output =
+            this.globals.map( g => tool.toJS(g) +";\n" ).join("\n")
+
+        output += this.functions.map( c=> tool.toJS(c) ).join("\n")
 
         output += "function main(){\n"
     
@@ -166,6 +176,23 @@ Program.prototype = {
     }
 }
 
+
+function Argument(name, type){
+    this.type = type
+    this.name = name
+    return this
+}
+Argument.prototype = {
+    toAST(){
+        return {type : this.type, name : this.name}
+    },
+    toC (nivel){
+        return tool.toJS(this.type) + " " + this.name
+    },
+    toJS(nivel){
+        return this.name
+    }
+}
 /**
  * User Function definition.
  * function if return type is set.
@@ -201,7 +228,8 @@ UserFunction.prototype = {
     },
     toJS(nivel){
         // literalmente idêntico ao do program com algumas poucas diferenças.
-        let output = "function "+this.name+"(){\n"
+        let argString = this.arguments.map( a => tool.toJS(a) ).join(",")
+        let output = "function "+this.name+"(" + argString + "){\n"
     
         this.body.forEach( c => {
             // JS não deixa fazer isso. Tem que filtrar.
@@ -583,6 +611,7 @@ const visit = {
             return visit.UserFunction(b.func_def())
         }
     },
+
     /**
      * Extracts a UserFunction definition from a sub_def context.
      * @param {sub_def} sub def context 
@@ -592,22 +621,39 @@ const visit = {
         // sub_name não é do "tipo" identifier, mas isso é válido
         // porque sub_name implementa o método getTest(), que é o que eu preciso.
 
-        let funcName = visit.Identifier(sub.sub_name())
+        let funcName = visit.Identifier(sub.name)
 
-        let ownerType
-        if(sub.type()){
-            ownerType = visit.Type(sub.type())
-            console.log("Método de "+ownerType.name)
-        }
+        let ownerType = sub.type() ? visit.Type(sub.type()) : undefined
 
-        let userSub = new UserFunction(funcName)
+        let args = sub.parlist() ?
+            sub.parlist().par().map( parameter =>{
+                let type = parameter.type() ? visit.Type(parameter.type()) : undefined
+                let arg = new Argument(visit.Identifier(parameter.identifier()), type)
+                return arg
+            }) : []
+
+        let userSub = new UserFunction(funcName, args, undefined, ownerType)
 
         Node.addChild( userSub, visit.Body( sub.body() ))
 
         return userSub
     },
     UserFunction(sub){
-
+        // é quase idêntico ao de cima.
+        // aliás, é idêntico ao de cima.
+        // preguiça de abstrair.
+        let funcName = visit.Identifier(sub.name)
+        let ownerType = sub.type(1) ? visit.Type(sub.type(1)) : undefined
+        let returnType = visit.Type(sub.type(0))
+        let args = sub.parlist() ?
+            sub.parlist().par().map( parameter =>{
+                let type = parameter.type() ? visit.Type(parameter.type()) : undefined
+                let arg = new Argument(visit.Identifier(parameter.identifier()), type)
+                return arg
+            }) : []
+        let userFunc = new UserFunction(funcName, args, returnType,ownerType)
+        Node.addChild(userFunc, visit.Body(sub.body()))
+        return userFunc
     },
     /*
         Instruções
@@ -675,11 +721,31 @@ const visit = {
         }
     },
     VarDeclaration(d){
-        const type = visit.Type(d.type()),
-        // pra cada var decl unit
-                identifier = visit.Identifier( d.varDecUnit(0).identifier() )
+        // declarações sempre são multiplas.
+        let result = []
 
-        return new VarDeclaration(new Var(identifier), new Type(type), null)
+        let isGlobal   = d.K_GLOBAL() !== null
+        let type = visit.Type(d.type())
+
+        d.decUnit().forEach( unit =>{
+            // variável ou array?
+            let identifier = visit.Identifier( unit.identifier( ))
+            // escalar
+            if(unit.EQUAL() && unit.exp()){
+                let initializer = undefined
+                if(unit.exp()) initializer = visit.Expression(unit.exp())
+                result.push(
+                                new VarDeclaration(new Var(identifier), isGlobal, type, initializer)
+                            )
+            }else if(unit.arrayDecUnit()){
+                console.log("Array! "+unit.arrayDecUnit().getText())
+            }
+            // array
+        })
+        // fazer isso pra cada varDecUnit
+        //        identifier = visit.Identifier( d.decUnit(0).varDecUnit().identifier() ),
+        //        initializer = d.decUnit(0).varDecUnit().exp() ? visit.Expression(d.decUnit(0).varDecUnit().exp()) : undefined
+        return result //new VarDeclaration(new Var(identifier), isGlobal, type, initializer)
     },
     Assignment(a){
         // assignment sempre é múltiplo.
@@ -782,9 +848,9 @@ const visit = {
             // adiciona essa condição...
             let part = branch.addCondition( visit.Expression(e) )
             // adiciona o corpo dessa condição...
-            if(ifContext.body(body_counter)){
+            if(ifContext.body(body_counter))
                 Node.addChild( part, visit.Body( ifContext.body(body_counter)) )
-            }
+            
             body_counter++
         })
 
@@ -792,9 +858,8 @@ const visit = {
         if(ifContext.if_else()){
             let part = branch.addElse()
             // adiciona o corpo do else
-            if(ifContext.body(body_counter)){
+            if(ifContext.body(body_counter))
                Node.addChild( part, visit.Body(ifContext.body(body_counter)) )
-            }
         }
 
         return branch
@@ -805,43 +870,41 @@ const visit = {
      * @returns Numeric, Text, Binary, 
      */
     Expression(e){
-        const A = x => visit.Expression( e.exp(0) ),
-              B = x => visit.Expression( e.exp(1) ),
-              bin = (a, o, b) => new Binary(a, o, b)
+        const bin = (exp, o) => new Binary( visit.Expression(exp.a), o, visit.Expression(exp.b))
+        
         // -x, !x
-        if(e.unary()){
-            return new Unary(A(), e.unary().getText())
-        }
+        if(e.unary())
+            return new Unary(e.exp(0), e.unary().getText())
+
         // ( expressão )
         // this is just
-        if(e.L_PAR() && e.R_PAR()){
-            return new Parentheses( A() )
-        }
-        // expressões binárias
+        if(e.L_PAR() && e.R_PAR())
+            return new Parentheses( e.exp(0) )
+
+        // outros tipos de expressão
         for (p of [
             [   () => e.postfixExpression(), 
                 () => visit.Postfix(e.postfixExpression())], // x
-
+            
             [   () => e.multiplicative(),
-                () => bin( A(e), e.multiplicative().getText(), B(e) ) ], // x * y
+                () => bin( e, e.multiplicative().getText() ) ], // x * y
     
             [   () => e.additive(),
-                () => bin(A(e), e.additive().getText(), B(e)) ], // x + y
+                () => bin(e, e.additive().getText()) ], // x + y
 
-            [   () => e.shift()     ,() => bin(A(e), e.shift().getText(), B(e) )], // x >> y, x << y
-            [   () => e.relational(),() => bin(A(e), e.relational().getText(), B(e) )], // x > y, x < y
-            [   () => e.equality()  ,() => bin(A(e), e.equality().getText(), B(e) )], // x == y, x != y
-            [   () => e.bitAnd()    ,() => bin(A(e), "&", B(e) )], // x & y
-            [   () => e.bitXor()    ,() => bin(A(e), "^", B(e))], // x ^ y
-            [   () => e.bitOr()     ,() => bin(A(e), "|", B(e))], // x | y
-            [   () => e.boolAnd()   ,() => bin(A(e), "&&", B(e))], // x && y
-            [   () => e.boolOr()    ,() => bin(A(e), "||", B(e)) ] // x || y
+            [   () => e.shift()     ,() => bin(e, e.shift().getText())], // x >> y, x << y
+            [   () => e.relational(),() => bin(e, e.relational().getText())], // x > y, x < y
+            [   () => e.equality()  ,() => bin(e, e.equality().getText())], // x == y, x != y
+            [   () => e.bitAnd()    ,() => bin(e, "&")], // x & y
+            [   () => e.bitXor()    ,() => bin(e, "^")], // x ^ y
+            [   () => e.bitOr()     ,() => bin(e, "|")], // x | y
+            [   () => e.boolAnd()   ,() => bin(e, "&&")], // x && y
+            [   () => e.boolOr()    ,() => bin(e, "||") ] // x || y
         ]){
             if(p[0]())
                 return p[1]()
         }
-
-            
+ 
         return undefined
     }            
 }
@@ -963,9 +1026,10 @@ Type.prototype = {
     }
 }
 
-function VarDeclaration(variable,type,initializer){
+function VarDeclaration(variable,global,type,initializer){
+    this.isGlobal = global
     this.variable = variable
-    this.type = type
+    this.type     = type
     this.initializer = initializer
     return this
 }
@@ -991,10 +1055,16 @@ VarDeclaration.prototype = {
         }
     },
     toC(nivel){
-        return tool.indent(nivel) + tool.toC(this.type) + " " + tool.toC(this.variable) + (this.initializer ? " = "+tool.toC(this.initializer) : "" )
+        return tool.indent(nivel) 
+            + tool.toC(this.type) + " " 
+            + tool.toC(this.variable) 
+            + (this.initializer ? " = "+tool.toC(this.initializer) : "" )
     },
     toJS(nivel){
-        return tool.indent(nivel) + "let " + tool.toJS(this.variable) + (this.initializer ? " = " + tool.toJS(this.initializer) : "")        
+        return tool.indent(nivel) + 
+            "let "+
+            tool.toJS(this.variable) + 
+            (this.initializer ? " = " + tool.toJS(this.initializer) : "")        
     }
 }
 

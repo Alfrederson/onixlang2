@@ -18,8 +18,8 @@ program: block*? EOF;
 block
    : import_directive
    | use_directive
-   | sub_def
-   | func_def
+   | sub_def        // ok
+   | func_def       // ok
    | record_def
    | ext_block
    | statement
@@ -36,11 +36,11 @@ statement
    | assignment // ok
    | postfixExpression //
    | conditional // ok
-   | for_loop //
+   // | for_loop // removido na V2
    | while_loop // ok
    | repeat_loop // ok
    | for_each_loop //
-   | think_loop // 
+   //| think_loop // removido na v2 
    | range_loop
  //  | labelDef   // removido na V2
  //  | gotoJump   // removido na V2
@@ -54,13 +54,13 @@ body: (statement)* ;
 
 record_def : K_RECORD identifier COLON declaration* K_END;
 
-func_def : K_FUNC  type (type PERIOD)? identifier DOUBLE_ARROW exp
-         | K_FUNC  type (type PERIOD)? identifier parlist DOUBLE_ARROW exp
-         | K_FUNC  type (type PERIOD)? identifier COLON body K_END
-         | K_FUNC  type (type PERIOD)? identifier parlist COLON body K_END
+func_def : K_FUNC  type (type PERIOD)? name=identifier DOUBLE_ARROW exp
+         | K_FUNC  type (type PERIOD)? name=identifier parlist DOUBLE_ARROW exp
+         | K_FUNC  type (type PERIOD)? name=identifier COLON body K_END
+         | K_FUNC  type (type PERIOD)? name=identifier parlist COLON body K_END
          ; 
 
-func_stub : K_FUNC type (type PERIOD)? identifier parlist? ;
+func_stub : K_FUNC type (type PERIOD)? name=identifier parlist? ;
 
 // V1
 //cpp_ext_block: K_CPP COLON (cpp_func_def|cpp_sub_def|cpp_var_def)* K_END;
@@ -78,6 +78,11 @@ ext_block: K_EXT string COLON (ext_func_def | ext_sub_def | ext_var_def )* K_END
 //  "nome_var_cpp": tipo
 // fim
 
+// tipos externos também!
+
+// ext "cpp"
+//  "pino" : tipo pino: ... fim
+
 // bloco externo vm:
 // ext "vm":
 //   "0": func tipo nome x:int, y:int, z:int
@@ -89,12 +94,11 @@ ext_func_id: string|number;
 ext_func_def: sub=ext_func_id COLON func_stub;
 ext_var_def : sub=string COLON declaration;
 
-sub_name : identifier;
-sub_def : K_SUB (type PERIOD)? sub_name COLON  body K_END
-        | K_SUB (type PERIOD)? sub_name parlist COLON  body K_END 
+sub_def : K_SUB (type PERIOD)? name=identifier COLON  body K_END
+        | K_SUB (type PERIOD)? name=identifier parlist COLON  body K_END 
         ; 
 
-sub_stub : K_SUB  sub_name parlist?;
+sub_stub : K_SUB (type PERIOD)? name=identifier parlist?;
 
 ext_sub_def: sub=ext_func_id COLON sub_stub;
 
@@ -108,9 +112,13 @@ breakLoop: K_BREAK ;
 continueLoop: K_CONTINUE ;
 retStatement: K_RETURN exp?;
 
+/*  V1
 par: (type (L_SBRAC R_SBRAC)?)? identifier 
    | identifier COLON type (L_SBRAC R_SBRAC)?
    | any_args ;
+*/
+par:  (type (L_SBRAC R_SBRAC)? COLON)? identifier 
+    | any_args ;
 
 parlist : L_PAR par (COMMA par)* R_PAR 
         | par (COMMA par)* ;
@@ -126,41 +134,58 @@ for_each_loop: K_FOR K_EACH ADDROP? identifier (COMMA identifier)? (K_IN|K_OF) p
 
 
 while_loop: K_WHILE exp COLON  body K_END;
-
 repeat_loop: K_REPEAT COLON  body K_UNTIL exp ;
+// removido na v2
+//think_loop : K_LOOP COLON  body K_END ;
 
-think_loop : K_LOOP COLON  body K_END ;
-
-declaration : varDeclaration | arrayDeclaration | constDeclaration ;
+// v1
+// declaration : varDeclaration | arrayDeclaration | constDeclaration ;
+declaration : varDeclaration | constDeclaration; 
 
 constDecUnit : identifier EQUAL exp;
 constDeclaration : K_CONST constDecUnit (COMMA constDecUnit)* ;
 
-initializer : L_PAR expList R_PAR
-            | exp
-            ;
+// v2
+// removida a síntaxe de "construtor
 
-varDecUnit : (identifier (EQUAL initializer)?);
+//initializer : L_PAR expList R_PAR
+//            | exp
+//            ;
+
+// v1
+/* 
+arrayDecUnit : identifier L_SBRAC exp R_SBRAC
+             | identifier EQUAL arrayInitializer
+             ;
+*/
+// v2
+arrayDecUnit : L_SBRAC exp R_SBRAC
+             | EQUAL arrayLiteral
+             ;
+
+// recursive for n-d array
+arrayLiteral : L_SBRAC exp (COMMA exp)* R_SBRAC;
+             
+decUnit : identifier ((EQUAL exp)? | arrayDecUnit);
 /* V1 
 varDeclaration : type varDecUnit (COMMA varDecUnit)* ;
 */
 /* V2  */
-varDeclaration : (K_VAR|K_GLOBAL) type COLON varDecUnit (COMMA varDecUnit)* ;     
+varDeclaration : (K_VAR|K_GLOBAL) type COLON decUnit (COMMA decUnit)* ;     
 
-arrayInitializer : L_SBRAC initializer (COMMA initializer)* R_SBRAC ;
+
+
 
 /*  V1
 arrayDecUnit : identifier L_SBRAC exp R_SBRAC
              | identifier EQUAL arrayInitializer
              ;
 */
-// V2
-arrayDecUnit : identifier L_SBRAC exp R_SBRAC
-             | identifier EQUAL arrayInitializer
-             ;
 
+/* removido na V2
 arrayDeclaration : (K_VAR|K_GLOBAL) type COLON arrayDecUnit (COMMA arrayDecUnit)*
                  ; 
+*/
 
 assignmentUnit : postfixExpression;
 assignment :  assignmentUnit (COMMA assignmentUnit)* assignOp exp;
@@ -190,17 +215,18 @@ exp
     : postfixExpression
     | unary exp              // *
     | L_PAR exp R_PAR        // *
-    | exp multiplicative exp // * 
-    | exp additive exp       // * 
-    | exp shift exp          // * 
-    | exp relational exp     // * 
-    | exp equality exp       // * 
-    | exp bitAnd exp         // * 
-    | exp bitXor exp         // * 
-    | exp bitOr exp          // * 
-    | exp boolAnd exp        // * 
-    | exp boolOr exp         // * 
-    | exp K_AS type          // não sei o que eu faço com isso
+    | a=exp multiplicative b=exp // * 
+    | a=exp additive b=exp       // * 
+    | a=exp shift b=exp          // * 
+    | a=exp relational b=exp     // * 
+    | a=exp equality b=exp       // * 
+    | a=exp bitAnd b=exp         // * 
+    | a=exp bitXor b=exp         // * 
+    | a=exp bitOr b=exp          // * 
+    | a=exp boolAnd b=exp        // * 
+    | a=exp boolOr b=exp         // * 
+    // removido na V2. typecasting é feito assim: tipo( variavel de outro tipo )
+    // | exp K_AS type          // não sei o que eu faço com isso
     ;
 
 multiplicative: DIV | MOD | MULT;
