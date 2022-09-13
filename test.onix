@@ -1,43 +1,10 @@
-global i32: times = 0,
-            numeros = [1,2,3,4]
-
-sub fart i32: loudness, i32: smell :
-    var i32: power_rating = loudness * pow(smell,2)
+sub Carro modelo:
+    this.name = "Vovorola"
+    return this
 fim
 
-func i32 somar a,b:
-    retorna a+b
+var object: veiculo = nada
+
+se veiculo == nada:
+ console.log("O veículo não existe.")
 fim
-
-sub bark:
-    console.log("The doggy went:")
-    var i32: barks = 10
-    while barks > 0:
-        barks = barks -1
-        console.log("WOOF!")
-        times = times + 1
-        if times == 1:
-            console.log("First woof")
-        else if times == 2:
-            console.log("Second woof")
-        else if times == 3:
-            console.log("Third woof")
-        else:
-            console.log("SHUT UP, DOG")
-        end
-    end
-end
-
-bark()
-
-
-x,y,z = 99
-
-console.log("The dog barked "+times+" times!")
-console.log("This is an example of side effect")
-
-console.log(
-    somar(
-        somar(x,y),z
-    )
-)

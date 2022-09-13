@@ -12,27 +12,10 @@ const
     fs = require("fs"),
     Node = require('./compiler/node'),
     Text = require('./compiler/text'),
-    Numeric = require('./compiler/numeric')
+    Numeric = require('./compiler/numeric'), // por que eu to fazendo isso?
+    Null = require('./compiler/null')
 
-function analisar(codigo_fonte, arvore){
-    const
-        antlr4 = require('antlr4'),
-        onixLexer = require('./onix/onixLexer'),
-        onixParser = require('./onix/onixParser'),
-        chars = new antlr4.InputStream(codigo_fonte),
-        lexer = new onixLexer.onixLexer(chars),
-        tokens = new antlr4.CommonTokenStream(lexer),
-        parser = new onixParser.onixParser(tokens)
-    parser.buildParseTrees = true
 
-    if(arvore){
-        escreve("arvore.el", parser.program().toStringTree(parser.ruleNames))
-        return analisar(codigo_fonte,false)
-    }else{
-        return parser.program()
-    }
-
-}
 
 const ler = nome => fs.readFileSync(nome).toString()
 const escreve = (path, texto) => fs.writeFileSync(path,texto)
@@ -115,6 +98,8 @@ function Program(){
 
 Program.prototype = {
     addChild(node){
+        if(!node)
+            return
         if(node.isFunctionDefinition){
             this.functions.push(node)
             return
@@ -711,9 +696,18 @@ const visit = {
                 return new Return()
             }
         }
+
+
     },
     Type(t){
         return new Type(t.getText())
+    },
+    Allocation(a){
+        // tipo
+        
+        let tipo = visit.Type(a.identifier())
+        // inicializadores
+        return new Allocation(tipo, [])
     },
     Declaration(d){
         if(d.varDeclaration()){
@@ -738,6 +732,15 @@ const visit = {
                                 new VarDeclaration(new Var(identifier), isGlobal, type, initializer)
                             )
             }else if(unit.arrayDecUnit()){
+                let adu = unit.arrayDecUnit()
+                // x[size]
+                if(adu.L_SBRAC() && adu.R_SBRAC()){
+                    result.push(
+                        new ArrayDeclaration(new Var(identifier), isGlobal, type, visit.Expression( adu.exp()))
+                    )
+                }
+
+                
                 console.log("Array! "+unit.arrayDecUnit().getText())
             }
             // array
@@ -799,6 +802,8 @@ const visit = {
             return new Numeric(visit.Number(p.number()))
         }else if(p.string()){
             return new Text(visit.String(p.string()))
+        }else if(p.nil()){
+            return new Null()
         }
     },
 
@@ -904,7 +909,12 @@ const visit = {
             if(p[0]())
                 return p[1]()
         }
- 
+
+         // new x
+        if(e.allocation()){
+            return visit.Allocation(e.allocation())
+        }
+
         return undefined
     }            
 }
@@ -1021,8 +1031,71 @@ Type.prototype = {
     },
     // isso nunca vai ser chamado porque JS tem tipagem dinâmica.
     // e eu não quero nada de typescript.
+    // em js, vai ser só new Tipo()
     toJS(){
-        return ""
+        return this.name
+    }
+}
+
+function Allocation(type, arguments){
+    this.type = type
+    this.arguments = arguments
+    return this
+}
+Allocation.prototype = {
+    toAST(){
+        return { allocation : {
+            type: tool.toAST(this.type)
+        }}
+    },
+    toJS(nivel){
+        return "new "+tool.toJS(this.type) + "()"
+    },
+    toC (nivel){
+        return "new "+tool.toC(this.type) + "()"
+    }
+}
+/**
+ * Declaração de array.
+ * @param {string} variable 
+ * @param {boolean} global 
+ * @param {Type} type 
+ * @param {Expression} size 
+ * @param {Expression[]} initializerList 
+ * @returns 
+ */
+function ArrayDeclaration(variable, global, type, size, initializerList){
+    this.isGlobal = global
+    this.variable = variable
+    this.type = type
+    // um ou o outro
+    if(initializerList){
+        this.size = new Numeric({ type : "dec", val : initializerList.length, raw : initializerList.length})
+    }else{
+        this.size = size
+    }
+    return this
+}
+ArrayDeclaration.prototype = {
+    isStatement : F_TRUE,
+    isDeclaration: F_TRUE,
+    toAST(){
+        return {
+            "array declaration" : {
+
+            }
+        }
+    },
+    toJS(nivel){
+        // array.from({length: tamanho}, ()=> new type)   tipos complexos
+        // array.from({length: tamanho}, ()=> "" / 0  )   tipos simples
+        return "let "+tool.indent(nivel) + tool.toJS(this.variable) + " = []"
+    },
+    toC(nivel){
+        TODO("Fazer o toC do array declaration direito.")
+
+        return tool.indent(nivel) + tool.toC(this.variable) + "[1] = {0}"
+        
     }
 }
 
@@ -1157,11 +1230,36 @@ Parentheses.prototype = {
 
 const jsonFormat = require('json-format')
 
-let programa = visit.Program( analisar(
-    ler("test.onix"), true
-))
+function analisar(codigo_fonte, arvore){
+    const
+        antlr4 = require('antlr4'),
+        onixLexer = require('./onix/onixLexer'),
+        onixParser = require('./onix/onixParser'),
+        chars = new antlr4.InputStream(codigo_fonte),
+        lexer = new onixLexer.onixLexer(chars),
+        tokens = new antlr4.CommonTokenStream(lexer),
+        parser = new onixParser.onixParser(tokens)
+    parser.buildParseTrees = true
 
-let formatted = jsonFormat(programa.toAST(),{
+    if(arvore){
+        escreve("arvore.el", parser.program().toStringTree(parser.ruleNames))
+        return analisar(codigo_fonte,false)
+    }else{
+        return visit.Program( parser.program() )
+    }
+}
+
+// pra usar isso dentro de um JS ou node da vida, a gente faz isso aqui:
+
+// texto = ...
+// programa = analisar( texto )
+// js = programa.toJS()
+
+let programa = analisar(
+    ler("test.onix"), true
+)
+
+let formatted = jsonFormat(tool.toAST(programa),{
     type: 'space',
     size: 2
 })
@@ -1169,14 +1267,14 @@ let formatted = jsonFormat(programa.toAST(),{
 
 // Testar o código.
 escreve("ast.json"   , formatted)
-escreve("output.cpp" , programa.toC (0))
-escreve("output.js"  , programa.toJS(0))
+escreve("output.cpp" , tool.toC (programa))
+escreve("output.js"  , tool.toJS(programa))
 // Ver o que eu tenho que fazer.
 TODOS()
 
 console.log("Executando o gerado...")
 
-eval(programa.toJS(0))
+eval(programa.toJS())
 
 
 

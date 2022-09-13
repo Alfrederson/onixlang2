@@ -9,7 +9,7 @@ grammar onix;
     //_unmatched = []
 }
 
-
+nil  : NIL;
 number: BIN | HEX | INT | FLOAT | K_FALSE | K_TRUE;
 string: StringLiteral  ;
 
@@ -47,6 +47,7 @@ statement
    | breakLoop    // ok
    | continueLoop // ok
    | retStatement // ok
+   | destruction  // novo na V2
    ;
 
 
@@ -142,6 +143,9 @@ repeat_loop: K_REPEAT COLON  body K_UNTIL exp ;
 // declaration : varDeclaration | arrayDeclaration | constDeclaration ;
 declaration : varDeclaration | constDeclaration; 
 
+allocation : K_NEW identifier (L_PAR expList? R_PAR)?;
+destruction: K_DELETE identifier;
+
 constDecUnit : identifier EQUAL exp;
 constDeclaration : K_CONST constDecUnit (COMMA constDecUnit)* ;
 
@@ -198,7 +202,9 @@ propOp: (PERIOD | DOUBLE_COLON | ARROW);
 primaryExpression
     : identifier
     | number
-    | string;
+    | string
+    | nil
+    ;
  
 postfixExpression
     : primaryExpression                           // termo A*
@@ -213,6 +219,7 @@ postfixExpression
 
 exp  
     : postfixExpression
+    | allocation             // novo na V2
     | unary exp              // *
     | L_PAR exp R_PAR        // *
     | a=exp multiplicative b=exp // * 
@@ -338,6 +345,10 @@ INTERROGATION: '?';
 INCREMENT: '++';
 DECREMENT: '--';
 
+// Novo na V2
+K_NEW: (N E W | C R I A R);
+K_DELETE: (F R E E | A P A G A R);
+
 fragment
     SEMI_COLON: ';';
 
@@ -443,6 +454,11 @@ LABEL
     : [@][a-zA-Z][a-zA-Z_0-9]*
     ;
 */
+
+// adicionado na V2
+NIL
+    : N U L L | N A D A
+    ;
 
 NAME
     : [a-zA-Z][a-zA-Z_0-9]*

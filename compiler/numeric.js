@@ -1,3 +1,9 @@
+/**
+ *  Cria um nó numérico.
+ * @param {{type: string, val: number, raw: string}} value 
+ * @returns 
+ */
+
 function Numeric(value){
     this.type = "numeric"
     this.value = value
