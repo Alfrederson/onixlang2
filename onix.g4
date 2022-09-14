@@ -331,7 +331,7 @@ BITWISE_XOR: '^';
 BITWISE_LSH: '<<';
 BITWISE_RSH: '>>';
 
-DOUBLE_PERIOD: '..';
+DOUBLE_PERIOD: ('..' | T O | A T E);
 ELLIPSIS: '...';
 PERIOD: '.';
 COLON: ':';
@@ -369,7 +369,7 @@ K_FUNC : F U N C;
 K_RECORD : T Y P E | T I P O;
 
 
-K_LOOP  : L O O P | T H I N K | P E N S A R ;
+// K_LOOP  : L O O P | T H I N K | P E N S A R ;
 
 K_CONST : C O N S T | C O N S T A N T E;
 

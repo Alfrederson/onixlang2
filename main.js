@@ -739,6 +739,13 @@ const visit = {
                         new ArrayDeclaration(new Var(identifier), isGlobal, type, visit.Expression( adu.exp()))
                     )
                 }
+                // x = [1,2,3,4,5]
+                if(adu.arrayLiteral()){
+                    let initializerList = adu.arrayLiteral().exp().map( e => visit.Expression(e) )
+                    result.push(
+                        new ArrayDeclaration(new Var(identifier), isGlobal, type, undefined, initializerList)
+                    )
+                }
 
                 
                 console.log("Array! "+unit.arrayDecUnit().getText())
@@ -1071,6 +1078,7 @@ function ArrayDeclaration(variable, global, type, size, initializerList){
     // um ou o outro
     if(initializerList){
         this.size = new Numeric({ type : "dec", val : initializerList.length, raw : initializerList.length})
+        this.initializerList = initializerList
     }else{
         this.size = size
     }
@@ -1089,7 +1097,11 @@ ArrayDeclaration.prototype = {
     toJS(nivel){
         // array.from({length: tamanho}, ()=> new type)   tipos complexos
         // array.from({length: tamanho}, ()=> "" / 0  )   tipos simples
-        return "let "+tool.indent(nivel) + tool.toJS(this.variable) + " = []"
+        if(this.initializerList){
+            return "let "+tool.indent(nivel) + tool.toJS(this.variable) + " = [" + this.initializerList.map( e => tool.toJS(e) ).join(",") + "]"
+        }else{
+            return "let "+tool.indent(nivel) + tool.toJS(this.variable) + " = Array.from({length: "+ tool.toJS(this.size)  +"})"
+        }
     },
     toC(nivel){
         TODO("Fazer o toC do array declaration direito.")
